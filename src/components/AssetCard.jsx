@@ -1,269 +1,209 @@
-import React, { useState, useEffect } from "react";
-import {
-  LineChart, Line, ResponsiveContainer, YAxis, XAxis,
-  Tooltip, CartesianGrid, ReferenceLine
-} from "recharts";
+import React, { useState } from "react";
 import Modal from "./Modal";
+import LiveChart from "./LiveChart";
+import TVWidget from "./TVWidget";
 import { C, FONT, RADIUS, BIAS_COL, DIR_ICON } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ASSET CARD v3 — Detail-Modal mit Elliott-Wave-Analyse + Begründung
+// ASSET CARD v4 — Live Candlestick Chart in Karte + Detail-Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ChartTooltip({ active, payload, label, unit }) {
-  if (!active || !payload?.length) return null;
-  const val = payload[0]?.value;
-  return (
-    <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: RADIUS.md, padding: "10px 14px", boxShadow: "0 8px 24px rgba(0,0,0,0.6)", pointerEvents: "none" }}>
-      <div style={{ color: C.textMid, marginBottom: 4, fontSize: 11 }}>{label}</div>
-      <div style={{ fontWeight: 700, fontSize: 17, fontVariantNumeric: "tabular-nums", fontFamily: FONT.mono, color: C.textHi }}>
-        {unit}{typeof val === "number" ? val.toLocaleString("de-DE", { maximumFractionDigits: 2 }) : val}
-      </div>
-    </div>
-  );
-}
-
-function BigChart({ data, levels = [], unit = "$", color = C.gold, h = 300 }) {
-  if (!data || !data.length) return null;
-  const displayData = data.filter(d => d.p !== undefined);
-  const vals = displayData.map(d => d.p);
-  const mn = Math.min(...vals), mx = Math.max(...vals), pad = (mx - mn) * 0.08;
-  const yMin = mn - pad, yMax = mx + pad;
-  const yTicks = Array.from({ length: 6 }, (_, i) => yMin + ((yMax - yMin) / 5) * i);
-
-  return (
-    <ResponsiveContainer width="100%" height={h}>
-      <LineChart data={displayData} margin={{ top: 12, right: 16, left: 4, bottom: 28 }}>
-        <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
-        <YAxis
-          domain={[yMin, yMax]} ticks={yTicks}
-          tick={{ fill: C.textMid, fontSize: 12, fontFamily: FONT.mono }} width={72}
-          tickFormatter={v => `${unit}${v >= 1000 ? Math.round(v).toLocaleString("de-DE") : parseFloat(v.toFixed(2))}`}
-          axisLine={{ stroke: C.borderHi }} tickLine={{ stroke: C.border }}
-        />
-        <XAxis dataKey="t" tick={{ fill: C.textMid, fontSize: 12 }}
-          axisLine={{ stroke: C.borderHi }} tickLine={{ stroke: C.border }}
-          interval={Math.max(1, Math.floor(displayData.length / 10))} height={32}
-        />
-        <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ stroke: C.gold, strokeWidth: 1, strokeDasharray: "4 2" }} />
-        {levels.map((lv, i) => (
-          <ReferenceLine key={i} y={lv.v} stroke={lv.col} strokeDasharray="5 3" strokeWidth={1.5}
-            label={{ value: lv.lbl, position: "insideTopRight", fill: lv.col, fontSize: 11, fontWeight: 700 }} />
-        ))}
-        <Line type="monotone" dataKey="p" stroke={color} strokeWidth={2.5} dot={false} isAnimationActive={false}
-          activeDot={{ r: 6, fill: color, stroke: C.bg, strokeWidth: 2 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ── FOKUS MODAL mit vollständiger Elliott-Wave-Analyse ─────────────────────────
 function FocusModal({ asset: a, onClose }) {
-  const [view, setView] = useState("7d");
+  const [view, setView] = useState("live");
   const bc = BIAS_COL[a.bias] || C.gold;
-  const lc = a.bias === "bull" ? C.bull : a.bias === "bear" ? C.bear : C.gold;
-
-  // Richtungs-Erklärung basierend auf chg24 und bias
-  const directionReason = a.chg24 > 0
-    ? { icon: "📈", color: C.bull, label: "Aktuell steigend", text: a.reasonUp || a.waveDetail }
+  const dirReason = a.chg24 > 0
+    ? { icon:"📈", color:C.bull, label:"Aktuell steigend — Warum?" }
     : a.chg24 < 0
-    ? { icon: "📉", color: C.bear, label: "Aktuell fallend", text: a.reasonDown || a.waveDetail }
-    : { icon: "➡️", color: C.gold, label: "Seitwärts", text: a.reasonSide || a.waveDetail };
+    ? { icon:"📉", color:C.bear, label:"Aktuell fallend — Warum?" }
+    : { icon:"➡️", color:C.gold, label:"Seitwärts — Warum?" };
 
   return (
-    <Modal onClose={onClose} maxWidth={1000} accentColor={bc}>
-      <div style={{ padding: "28px 36px 28px" }}>
-
-        {/* ── HEADER ── */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 22 }}>
-          <span style={{ fontSize: 46, lineHeight: 1 }}>{a.emoji}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <h2 style={{ fontFamily: FONT.serif, fontSize: 30, color: C.textHi, margin: 0 }}>{a.name}</h2>
-              <span style={{ fontSize: 13, color: C.textLow }}>{a.ticker}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: bc, border: `1px solid ${bc}44`, borderRadius: 5, padding: "3px 12px" }}>
-                {DIR_ICON[a.bias]} {a.bias === "bull" ? "BULLISH" : a.bias === "bear" ? "BEARISH" : "NEUTRAL"}
+    <Modal onClose={onClose} maxWidth={1020} accentColor={bc}>
+      <div style={{ padding:"28px 36px 28px" }}>
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"flex-start", gap:16, marginBottom:22 }}>
+          <span style={{ fontSize:46, lineHeight:1 }}>{a.emoji}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              <h2 style={{ fontFamily:FONT.serif, fontSize:30, color:C.textHi, margin:0 }}>{a.name}</h2>
+              <span style={{ fontSize:13, color:C.textLow }}>{a.ticker}</span>
+              <span style={{ fontSize:12, fontWeight:700, color:bc, border:`1px solid ${bc}44`, borderRadius:5, padding:"3px 12px" }}>
+                {DIR_ICON[a.bias]} {a.bias==="bull"?"BULLISH":a.bias==="bear"?"BEARISH":"NEUTRAL"}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginTop: 8 }}>
-              <span style={{ fontSize: 40, fontWeight: 700, color: C.textHi, fontVariantNumeric: "tabular-nums", fontFamily: FONT.mono }}>{a.unit}{a.price}</span>
-              <span style={{ fontSize: 17, fontWeight: 700, color: a.chg24 >= 0 ? C.bull : C.bear }}>{a.chg24 >= 0 ? "+" : ""}{a.chg24}% 24h</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: a.chg7 >= 0 ? C.bull : C.bear }}>{a.chg7 >= 0 ? "+" : ""}{a.chg7}% 7D</span>
+            <div style={{ display:"flex", alignItems:"baseline", gap:14, marginTop:8 }}>
+              <span style={{ fontSize:40, fontWeight:700, color:C.textHi, fontVariantNumeric:"tabular-nums", fontFamily:FONT.mono }}>{a.unit}{a.price}</span>
+              <span style={{ fontSize:17, fontWeight:700, color:a.chg24>=0?C.bull:C.bear }}>{a.chg24>=0?"+":""}{a.chg24}% 24h</span>
+              <span style={{ fontSize:14, fontWeight:600, color:a.chg7>=0?C.bull:C.bear }}>{a.chg7>=0?"+":""}{a.chg7}% 7D</span>
             </div>
           </div>
         </div>
 
-        {/* ── WARUM STEIGT/FÄLLT ES? ── */}
-        <div style={{ background: C.surface, border: `1px solid ${directionReason.color}33`, borderRadius: RADIUS.lg, padding: "18px 22px", marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <span style={{ fontSize: 22 }}>{directionReason.icon}</span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: directionReason.color, letterSpacing: "0.02em" }}>
-              {directionReason.label} — Warum?
-            </span>
+        {/* Warum steigt/fällt es */}
+        <div style={{ background:C.surface, border:`1px solid ${dirReason.color}33`, borderRadius:RADIUS.lg, padding:"18px 22px", marginBottom:18 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+            <span style={{ fontSize:22 }}>{dirReason.icon}</span>
+            <span style={{ fontSize:15, fontWeight:800, color:dirReason.color }}>{dirReason.label}</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {(a.reasons || []).map((r, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, color: r.col || C.textMid, flexShrink: 0, marginTop: 1 }}>{r.icon}</span>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {(a.reasons||[]).map((r,i)=>(
+              <div key={i} style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+                <span style={{ fontSize:16, flexShrink:0, marginTop:1 }}>{r.icon}</span>
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: r.col || C.textHi }}>{r.title}: </span>
-                  <span style={{ fontSize: 13, color: C.textMid, lineHeight: 1.6 }}>{r.text}</span>
+                  <span style={{ fontSize:14, fontWeight:700, color:r.col||C.textHi }}>{r.title}: </span>
+                  <span style={{ fontSize:14, color:C.textMid, lineHeight:1.65 }}>{r.text}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── ELLIOTT-WELLEN-POSITION ── */}
-        <div style={{ background: C.surface, border: `1px solid ${C.gold}33`, borderRadius: RADIUS.lg, padding: "18px 22px", marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <span style={{ fontSize: 22 }}>〰️</span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: C.gold }}>Elliott-Wellen-Position</span>
+        {/* Elliott-Wellen-Position */}
+        <div style={{ background:C.surface, border:`1px solid ${C.gold}33`, borderRadius:RADIUS.lg, padding:"16px 20px", marginBottom:18 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+            <span style={{ fontSize:20 }}>〰️</span>
+            <span style={{ fontSize:15, fontWeight:800, color:C.gold }}>Elliott-Wellen-Position</span>
+            <span style={{ fontSize:13, color:C.textMid, marginLeft:"auto" }}>{a.waveStructure}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-            <div style={{ background: C.bg, borderRadius: RADIUS.md, padding: "12px 16px" }}>
-              <div style={{ fontSize: 10, color: C.textLow, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Aktuelle Welle</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.gold, fontFamily: FONT.mono }}>{a.currentWave || "?"}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
+            <div style={{ background:C.bg, borderRadius:RADIUS.md, padding:"12px 16px" }}>
+              <div style={{ fontSize:11, color:C.textLow, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>Aktuelle Welle</div>
+              <div style={{ fontSize:22, fontWeight:800, color:C.gold, fontFamily:FONT.mono }}>{a.currentWave||"?"}</div>
             </div>
-            <div style={{ background: C.bg, borderRadius: RADIUS.md, padding: "12px 16px" }}>
-              <div style={{ fontSize: 10, color: C.textLow, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>Übergeordnete Struktur</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: C.textMid }}>{a.waveStructure || "A-B-C Korrektur"}</div>
+            <div style={{ background:C.bg, borderRadius:RADIUS.md, padding:"12px 16px" }}>
+              <div style={{ fontSize:11, color:C.textLow, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>Wave-Label</div>
+              <div style={{ fontSize:14, fontWeight:700, color:C.textMid }}>{a.wave.split("—")[0].trim()}</div>
             </div>
           </div>
-          <p style={{ fontSize: 14, color: C.textMid, lineHeight: 1.75, margin: 0 }}>{a.waveDetail}</p>
+          <p style={{ fontSize:14, color:C.textMid, lineHeight:1.75, margin:0 }}>{a.waveDetail}</p>
         </div>
 
-        {/* ── KEY STATS ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 20 }}>
-          {a.keyStats.map(([k, v], i) => (
-            <div key={i} style={{ background: C.surface, borderRadius: RADIUS.md, padding: "12px 14px" }}>
-              <div style={{ fontSize: 10, color: C.textLow, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" }}>{k}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.textHi, fontVariantNumeric: "tabular-nums", fontFamily: FONT.mono }}>{v}</div>
+        {/* Key Stats */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:8, marginBottom:18 }}>
+          {(a.keyStats||[]).map(([k,v],i)=>(
+            <div key={i} style={{ background:C.surface, borderRadius:RADIUS.md, padding:"12px 14px" }}>
+              <div style={{ fontSize:10, color:C.textLow, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>{k}</div>
+              <div style={{ fontSize:14, fontWeight:700, color:C.textHi, fontVariantNumeric:"tabular-nums", fontFamily:FONT.mono }}>{v}</div>
             </div>
           ))}
         </div>
 
-        {/* ── CHART TABS ── */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-          {[["7d","7 Tage · 1H"], ["daily","Daily · 6 Mon."], ["tv","TradingView öffnen"]].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} style={{
-              flex: 1, padding: "9px 0",
-              background: view === v ? C.surface : "transparent",
-              border: view === v ? `1px solid ${C.gold}55` : `1px solid ${C.border}`,
-              borderRadius: RADIUS.sm, color: view === v ? C.gold : C.textMid,
-              fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+        {/* Chart Tabs */}
+        <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+          {[
+            ["live","Live Kerzen (Binance)"],
+            ["tv","TradingView (dein Chart)"],
+          ].map(([v,l])=>(
+            <button key={v} onClick={()=>setView(v)} style={{
+              flex:1, padding:"9px 0",
+              background:view===v?C.surface:"transparent",
+              border:view===v?`1px solid ${C.gold}55`:`1px solid ${C.border}`,
+              borderRadius:RADIUS.sm, color:view===v?C.gold:C.textMid,
+              fontSize:13, fontWeight:600, cursor:"pointer", transition:"all 0.15s",
             }}>{l}</button>
           ))}
         </div>
 
-        {view === "7d" && a.path7d && <BigChart data={a.path7d} levels={a.levels} unit={a.unit} color={lc} h={380} />}
-        {view === "daily" && <BigChart data={a.pathD} unit={a.unit} color={lc} h={380} />}
-        {view === "tv" && (
-          <div style={{ height: 380, background: C.surface, borderRadius: RADIUS.md, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, border: `1px solid ${C.border}` }}>
-            <span style={{ fontSize: 52 }}>{a.emoji}</span>
-            <a href={a.tvLink} target="_blank" rel="noopener noreferrer" style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              background: C.blue, color: "#fff", textDecoration: "none",
-              padding: "14px 34px", borderRadius: RADIUS.md, fontSize: 15, fontWeight: 700,
-            }}>📊 {a.ticker} — deinen TradingView-Chart öffnen →</a>
-            <p style={{ fontSize: 12, color: C.textLow, textAlign: "center", maxWidth: 340 }}>
-              Öffnet deinen gespeicherten Chart mit Wellenzählung, Levels und Indikatoren
-            </p>
+        {view==="live" && (
+          <div style={{ border:`1px solid ${C.border}`, borderRadius:RADIUS.md, overflow:"hidden", padding:"8px 4px", background:C.surface }}>
+            <LiveChart assetId={a.id} unit={a.unit} h={380} interval="1h" />
           </div>
         )}
 
-        <div style={{ marginTop: 14 }}>
-          <a href={a.tvLink} target="_blank" rel="noopener noreferrer" style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "9px 16px", background: C.surface,
-            border: `1px solid ${C.blue}44`, borderRadius: RADIUS.sm,
-            color: C.blue, fontSize: 13, fontWeight: 600, textDecoration: "none",
-          }}>📊 In TradingView öffnen →</a>
-        </div>
+        {view==="tv" && (
+          <div>
+            <TVWidget symbol={a.tvSymbol || "BINANCE:BTCUSDT"} height={400} interval="60" />
+            <div style={{ marginTop:10 }}>
+              <a href={a.tvLink} target="_blank" rel="noopener noreferrer" style={{
+                display:"inline-flex", alignItems:"center", gap:6,
+                padding:"9px 16px", background:C.surface,
+                border:`1px solid ${C.blue}44`, borderRadius:RADIUS.sm,
+                color:C.blue, fontSize:13, fontWeight:600, textDecoration:"none",
+              }}>📊 In TradingView öffnen (deine Wellenzählung) →</a>
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
   );
 }
 
-// ── ASSET KARTE — Großer Chart direkt sichtbar ──────────────────────────────
+// ── ASSET KARTE — Live Candlestick direkt sichtbar ───────────────────────────
 export default function AssetCard({ a }) {
   const [focused, setFocused] = useState(false);
-  const [view, setView] = useState("7d");
   const bc = BIAS_COL[a.bias] || C.gold;
-  const lc = a.bias === "bull" ? C.bull : a.bias === "bear" ? C.bear : C.gold;
 
   return (
     <>
       <div style={{
-        background: C.card, border: `1px solid ${C.border}`,
-        borderRadius: RADIUS.lg, padding: "20px 22px 16px",
-        transition: "border-color 0.15s",
+        background:C.card, border:`1px solid ${C.border}`,
+        borderRadius:RADIUS.lg, padding:"20px 22px 16px",
+        transition:"border-color 0.15s",
       }}
-        onMouseEnter={e => e.currentTarget.style.borderColor = bc}
-        onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+        onMouseEnter={e=>e.currentTarget.style.borderColor=bc}
+        onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}
       >
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 22 }}>{a.emoji}</span>
-              <span style={{ fontFamily: FONT.serif, fontSize: 20, fontWeight: 700, color: C.textHi }}>{a.name}</span>
-              <span style={{ fontSize: 12, color: C.textLow }}>{a.ticker}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: bc, border: `1px solid ${bc}44`, borderRadius: 4, padding: "2px 9px" }}>
-                {DIR_ICON[a.bias]} {a.bias === "bull" ? "BULL" : a.bias === "bear" ? "BEAR" : "NEUTRAL"}
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+              <span style={{ fontSize:22 }}>{a.emoji}</span>
+              <span style={{ fontFamily:FONT.serif, fontSize:21, fontWeight:700, color:C.textHi }}>{a.name}</span>
+              <span style={{ fontSize:12, color:C.textLow }}>{a.ticker}</span>
+              <span style={{ fontSize:12, fontWeight:700, color:bc, border:`1px solid ${bc}44`, borderRadius:4, padding:"2px 9px" }}>
+                {DIR_ICON[a.bias]} {a.bias==="bull"?"BULL":a.bias==="bear"?"BEAR":"NEUTRAL"}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-              <span style={{ fontSize: 28, fontWeight: 700, color: C.textHi, fontVariantNumeric: "tabular-nums", fontFamily: FONT.mono }}>{a.unit}{a.price}</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: a.chg24 >= 0 ? C.bull : C.bear }}>{a.chg24 >= 0 ? "+" : ""}{a.chg24}% 24h</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: a.chg7 >= 0 ? C.bull : C.bear }}>{a.chg7 >= 0 ? "+" : ""}{a.chg7}% 7D</span>
+            <div style={{ display:"flex", alignItems:"baseline", gap:12 }}>
+              <span style={{ fontSize:30, fontWeight:700, color:C.textHi, fontVariantNumeric:"tabular-nums", fontFamily:FONT.mono }}>
+                {a.unit}{a.price}
+              </span>
+              <span style={{ fontSize:16, fontWeight:700, color:a.chg24>=0?C.bull:C.bear }}>
+                {a.chg24>=0?"+":""}{a.chg24}% 24h
+              </span>
+              <span style={{ fontSize:14, fontWeight:600, color:a.chg7>=0?C.bull:C.bear }}>
+                {a.chg7>=0?"+":""}{a.chg7}% 7D
+              </span>
             </div>
           </div>
-          <button onClick={() => setFocused(true)} style={{
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: RADIUS.sm, padding: "7px 14px",
-            color: C.textMid, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            transition: "all 0.15s", flexShrink: 0,
+          <button onClick={()=>setFocused(true)} style={{
+            background:C.surface, border:`1px solid ${C.border}`,
+            borderRadius:RADIUS.sm, padding:"8px 16px",
+            color:C.textMid, fontSize:13, fontWeight:600, cursor:"pointer",
+            transition:"all 0.15s", flexShrink:0,
           }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = bc; e.currentTarget.style.color = bc; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMid; }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor=bc; e.currentTarget.style.color=bc; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.textMid; }}
           >⊕ Detail & Analyse</button>
         </div>
 
-        {/* View Tabs */}
-        <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
-          {[["7d","7 Tage"], ["daily","6 Monate"]].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} disabled={v === "7d" && !a.path7d}
-              style={{
-                padding: "5px 12px",
-                background: view === v ? C.surface : "transparent",
-                border: view === v ? `1px solid ${C.gold}44` : `1px solid ${C.border}`,
-                borderRadius: RADIUS.sm, color: view === v ? C.gold : C.textLow,
-                fontSize: 11, fontWeight: 600, cursor: "pointer",
-                opacity: v === "7d" && !a.path7d ? 0.4 : 1,
-              }}>{l}</button>
-          ))}
+        {/* LIVE CANDLESTICK CHART — direkt in der Karte */}
+        <div style={{ border:`1px solid ${C.border}`, borderRadius:RADIUS.md, overflow:"hidden", padding:"6px 2px", background:C.surface }}>
+          {BIAS_COL[a.id] || ["btc","eth","sol"].includes(a.id) ? (
+            <LiveChart assetId={a.id} unit={a.unit} h={220} interval="1h" />
+          ) : (
+            // Für Gold/Silber: statische Linie (keine Binance-Daten)
+            <div style={{ height:220, display:"flex", alignItems:"center", justifyContent:"center", color:C.textLow, fontSize:13 }}>
+              Chart wird geladen...
+            </div>
+          )}
         </div>
 
-        {/* Big Chart */}
-        <BigChart
-          data={view === "7d" ? (a.path7d || a.pathD) : a.pathD}
-          levels={a.levels} unit={a.unit} color={lc} h={260}
-        />
-
-        {/* Wave + Quick Reason */}
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.gold, lineHeight: 1.4, marginBottom: 4 }}>{a.wave}</div>
-          {a.reasons && a.reasons[0] && (
-            <div style={{ fontSize: 12, color: C.textMid, display: "flex", gap: 6, alignItems: "flex-start" }}>
+        {/* Wave Label */}
+        <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:14, fontWeight:700, color:C.gold, lineHeight:1.4, marginBottom:4 }}>
+            {a.wave}
+          </div>
+          {a.reasons?.[0] && (
+            <div style={{ fontSize:13, color:C.textMid, display:"flex", gap:6 }}>
               <span>{a.reasons[0].icon}</span>
-              <span>{a.reasons[0].title}: {a.reasons[0].text}</span>
+              <span><strong style={{color:C.textHi}}>{a.reasons[0].title}:</strong> {a.reasons[0].text}</span>
             </div>
           )}
         </div>
       </div>
 
-      {focused && <FocusModal asset={a} onClose={() => setFocused(false)} />}
+      {focused && <FocusModal asset={a} onClose={()=>setFocused(false)} />}
     </>
   );
 }
