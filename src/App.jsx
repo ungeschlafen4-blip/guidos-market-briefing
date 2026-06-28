@@ -4,7 +4,7 @@ import TradeGroup from "./components/TradeCard";
 import NewsCard from "./components/NewsCard";
 import CalendarView from "./components/CalendarView";
 import NewsTicker from "./components/NewsTicker";
-import MacroTile, { MACRO_ASSETS } from "./components/MacroTile_v4";
+import MacroTile, { MACRO_ASSETS } from "./components/MacroTile_v2";
 import { ASSETS } from "./data/assets";
 import { NEWS_DEFAULT } from "./data/news";
 import { C, FONT, RADIUS } from "./styles/theme";
