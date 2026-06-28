@@ -1,72 +1,109 @@
-import React from "react";
+import React, { useState } from "react";
+import Modal from "./Modal";
 import { C, FONT, RADIUS } from "../styles/theme";
 
-// Header ohne Ampel-Leiste (wird durch NewsTicker ersetzt)
-export default function Header({ snap, loading, error, lastUpd, onRefresh, isMobile, hideBiasStrip }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// NEWS CARD v2 — Größer, luftiger, Pop-up Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+function NewsModal({ n, onClose }) {
   return (
-    <header style={{ borderBottom: `1px solid ${C.border}`, paddingBottom: 16, marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <div>
-          <h1 style={{
-            fontFamily: FONT.serif,
-            fontSize: isMobile ? 22 : 32,
-            margin: 0, letterSpacing: "0.01em", color: C.textHi, fontWeight: 700,
-          }}>
-            Guido's <span style={{ color: C.gold }}>Market</span> Briefing
-          </h1>
-          <div style={{ fontSize: 12, color: C.textLow, marginTop: 5, letterSpacing: "0.02em" }}>
-            {lastUpd
-              ? <><span style={{ color: C.bull }}>●</span>{" "}Live Update: {lastUpd} MESZ</>
-              : snap?.time || "Snapshot"
-            }
-            {" · "}Elliott-Wave{" · "}1H/2H Trades{" · "}Desktop + Mobile
+    <Modal onClose={onClose} maxWidth={740} accentColor={n.impactCol || C.gold}>
+      <div style={{ padding: "30px 36px 28px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <span style={{ fontSize: 32 }}>{n.icon || "📰"}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.gold, border: `1px solid ${C.gold}44`, borderRadius: 4, padding: "3px 10px", letterSpacing: "0.05em" }}>{n.tag}</span>
+          <span style={{ fontSize: 12, color: C.textLow }}>{n.date}</span>
+          <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: n.impactCol || C.gold, border: `1px solid ${(n.impactCol || C.gold)}44`, borderRadius: 4, padding: "3px 12px" }}>{n.impact || ""}</span>
+        </div>
+
+        <h2 style={{ fontFamily: FONT.serif, fontSize: 22, color: C.textHi, fontWeight: 700, lineHeight: 1.4, margin: "0 0 20px 0" }}>{n.title}</h2>
+
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 18 }}>
+          {n.full.split("\n").filter(Boolean).map((line, i) => {
+            const isSection = line.startsWith("📌") || line.startsWith("📈") || line.startsWith("⚡");
+            const isBullet = line.startsWith("•");
+            return (
+              <p key={i} style={{
+                fontSize: isSection ? 14 : 13.5,
+                fontWeight: isSection ? 700 : 400,
+                color: isSection ? C.gold : isBullet ? C.textHi : C.textMid,
+                lineHeight: 1.8, margin: 0,
+                marginBottom: isSection ? 10 : 6,
+                paddingLeft: isBullet ? 18 : 0,
+              }}>{line}</p>
+            );
+          })}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export default function NewsCard({ n }) {
+  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <>
+      <div
+        onClick={() => setOpen(true)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          background: hovered ? C.cardHov : C.card,
+          border: `1px solid ${hovered ? C.borderHi : C.border}`,
+          borderRadius: RADIUS.lg,
+          padding: "20px 22px",
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+          transform: hovered ? "translateY(-2px)" : "none",
+          boxShadow: hovered ? "0 8px 28px rgba(0,0,0,0.4)" : "none",
+        }}
+      >
+        {/* Top Row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 24 }}>{n.icon || "📰"}</span>
+            <div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.gold, border: `1px solid ${C.gold}44`, borderRadius: 4, padding: "2px 8px", letterSpacing: "0.05em" }}>{n.tag}</span>
+              <span style={{ fontSize: 11, color: C.textLow, marginLeft: 10 }}>{n.date}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              color: n.impactCol || C.gold,
+              border: `1px solid ${(n.impactCol || C.gold)}44`,
+              borderRadius: 4, padding: "2px 9px",
+            }}>{n.impact || ""}</span>
+            <span style={{ fontSize: 14, color: hovered ? C.blue : C.textLow, transition: "color 0.15s" }}>
+              {hovered ? "→" : "⊕"}
+            </span>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <a href="https://terminal.mcoglobal.live/" target="_blank" rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: C.surface, border: `1px solid ${C.purple}55`,
-              borderRadius: RADIUS.md, padding: "10px 16px",
-              color: C.purple, fontSize: 13, fontWeight: 700,
-              textDecoration: "none", transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#1a1528"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = C.surface; }}
-          >🔗 {isMobile ? "MCO" : "MCO Terminal"}</a>
+        {/* Title */}
+        <div style={{ fontFamily: FONT.serif, fontSize: 16, color: C.textHi, fontWeight: 700, lineHeight: 1.45, marginBottom: 10 }}>
+          {n.title}
+        </div>
 
-          <button onClick={onRefresh} disabled={loading}
-            style={{
-              background: C.surface, border: `1px solid ${loading ? C.textLow : C.gold}`,
-              borderRadius: RADIUS.md, padding: "10px 16px",
-              color: loading ? C.textLow : C.gold,
-              fontSize: 13, fontWeight: 700, cursor: loading ? "wait" : "pointer",
-              display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "#1a1500"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = C.surface; }}
-          >
-            <span style={{ fontSize: 16, display: "inline-block", animation: loading ? "spin 0.8s linear infinite" : "none" }}>
-              {loading ? "⟳" : "🔄"}
-            </span>
-            {isMobile ? "" : "Live Update"}
-          </button>
+        {/* Summary */}
+        <p style={{ fontSize: 13.5, color: C.textMid, lineHeight: 1.65, margin: 0, marginBottom: 12 }}>{n.summary}</p>
+
+        {/* Read More */}
+        <div style={{
+          fontSize: 12,
+          color: hovered ? C.blue : C.textLow,
+          transition: "color 0.15s",
+          display: "flex", alignItems: "center", gap: 5,
+          paddingTop: 10, borderTop: `1px solid ${C.border}`,
+        }}>
+          {hovered ? "→ Vollständige Analyse mit Fachbegriff-Erklärungen öffnen" : "Klicken für vollständige Analyse + Erklärungen"}
         </div>
       </div>
 
-      {error && (
-        <div style={{ marginTop: 10, padding: "8px 14px", background: "#160606", border: `1px solid ${C.bear}44`, borderRadius: RADIUS.sm, fontSize: 12, color: C.bear }}>
-          ⚠️ {error}
-        </div>
-      )}
-      {loading && (
-        <div style={{ marginTop: 10, padding: "8px 14px", background: C.surface, border: `1px solid ${C.gold}33`, borderRadius: RADIUS.sm, fontSize: 12, color: C.textMid }}>
-          🔍 Claude sucht: BTC · ETH · SOL · Gold · Silber + News...
-        </div>
-      )}
-
-      <style>{`@keyframes spin { from { transform:rotate(0deg) } to { transform:rotate(360deg) } }`}</style>
-    </header>
+      {open && <NewsModal n={n} onClose={() => setOpen(false)} />}
+    </>
   );
 }
