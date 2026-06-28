@@ -1,18 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useState } from "react";
 import Modal from "./Modal";
 import LiveChart from "./LiveChart";
+import MetalChart from "./MetalChart";
 import { C, FONT, RADIUS, BIAS_COL, DIR_ICON } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ASSET CARD v5
-// - Live Candlestick Chart mit Elliott-Wellen-Labels
-// - Kein eingebettetes TV-Widget — sauberer Link-Button zu deinem Chart
-// - Warum steigt/fällt + Wellen-Position im Modal
+// ASSET CARD v6 — Live Candlestick (Krypto) + Metal Chart (Gold/Silber)
 // ─────────────────────────────────────────────────────────────────────────────
 
+const CRYPTO_IDS = ["btc","eth","sol"];
+const METAL_IDS  = ["gold","silver"];
+
 function FocusModal({ asset: a, onClose }) {
-  const [view, setView] = useState("live");
+  const [view, setView] = useState("chart");
   const bc = BIAS_COL[a.bias] || C.gold;
+  const isMetal = METAL_IDS.includes(a.id);
   const dirReason = a.chg24 > 0
     ? { icon:"📈", color:C.bull,  label:"Aktuell steigend — Warum?" }
     : a.chg24 < 0
@@ -22,7 +25,6 @@ function FocusModal({ asset: a, onClose }) {
   return (
     <Modal onClose={onClose} maxWidth={1020} accentColor={bc}>
       <div style={{ padding:"28px 36px 28px" }}>
-
         {/* Header */}
         <div style={{ display:"flex", alignItems:"flex-start", gap:16, marginBottom:22 }}>
           <span style={{ fontSize:46, lineHeight:1 }}>{a.emoji}</span>
@@ -42,9 +44,12 @@ function FocusModal({ asset: a, onClose }) {
           </div>
         </div>
 
-        {/* Chart Tabs — OBEN */}
+        {/* Chart Tabs */}
         <div style={{ display:"flex", gap:6, marginBottom:14 }}>
-          {[["live","Live Kerzen + Elliott-Wellen"],["tv","Mein TradingView-Chart öffnen"]].map(([v,l])=>(
+          {[
+            ["chart", isMetal?"7-Tage-Chart":"Live Kerzen + Elliott-Wellen"],
+            ["tv",    "Mein TradingView-Chart öffnen"],
+          ].map(([v,l])=>(
             <button key={v} onClick={()=>setView(v)} style={{
               flex:1, padding:"10px 0",
               background:view===v?C.surface:"transparent",
@@ -55,41 +60,36 @@ function FocusModal({ asset: a, onClose }) {
           ))}
         </div>
 
-        {/* Live Chart mit Elliott-Wellen */}
-        {view==="live" && (
+        {/* Chart */}
+        {view==="chart" && (
           <div style={{ border:`1px solid ${C.border}`, borderRadius:RADIUS.md, overflow:"hidden", padding:"8px 4px", background:C.surface, marginBottom:18 }}>
-            <LiveChart assetId={a.id} unit={a.unit} h={400} interval="1h" waveLabels={a.waveLabels} />
+            {isMetal
+              ? <MetalChart assetId={a.id} unit={a.unit} h={400} levels={a.levels||[]} currentPrice={a.price?.replace(".","").replace(",",".")} />
+              : <LiveChart assetId={a.id} unit={a.unit} h={400} interval="1h" waveLabels={a.waveLabels||[]} />
+            }
           </div>
         )}
 
-        {/* TradingView Link — sauber und groß */}
+        {/* TradingView Link */}
         {view==="tv" && (
           <div style={{
             background:C.surface, borderRadius:RADIUS.lg,
-            border:`1px solid ${bc}44`,
-            padding:"40px 30px",
+            border:`1px solid ${bc}44`, padding:"40px 30px",
             display:"flex", flexDirection:"column", alignItems:"center",
-            justifyContent:"center", gap:20, marginBottom:18,
-            minHeight:280,
+            justifyContent:"center", gap:20, marginBottom:18, minHeight:280,
           }}>
             <span style={{ fontSize:60 }}>{a.emoji}</span>
             <div style={{ textAlign:"center" }}>
-              <div style={{ fontSize:20, fontWeight:700, color:C.textHi, marginBottom:8 }}>
-                Dein gespeicherter TradingView-Chart
-              </div>
+              <div style={{ fontSize:20, fontWeight:700, color:C.textHi, marginBottom:8 }}>Dein gespeicherter TradingView-Chart</div>
               <div style={{ fontSize:14, color:C.textMid, marginBottom:24, lineHeight:1.6 }}>
-                Mit deiner Wellenzählung, Fibonacci-Levels und Indikatoren.<br/>
-                Öffnet in neuem Tab.
+                Mit deiner Wellenzählung, Fibonacci-Levels und Indikatoren.<br/>Öffnet in neuem Tab.
               </div>
               <a href={a.tvLink} target="_blank" rel="noopener noreferrer" style={{
                 display:"inline-flex", alignItems:"center", gap:10,
                 background:C.blue, color:"#fff", textDecoration:"none",
-                padding:"14px 36px", borderRadius:RADIUS.md,
-                fontSize:16, fontWeight:700, letterSpacing:"0.02em",
+                padding:"14px 36px", borderRadius:RADIUS.md, fontSize:16, fontWeight:700,
                 boxShadow:`0 4px 20px ${C.blue}44`,
-              }}>
-                📊 {a.ticker} Chart öffnen →
-              </a>
+              }}>📊 {a.ticker} Chart öffnen →</a>
             </div>
           </div>
         )}
@@ -126,7 +126,7 @@ function FocusModal({ asset: a, onClose }) {
               <div style={{ fontSize:24, fontWeight:800, color:C.gold, fontFamily:FONT.mono }}>{a.currentWave||"?"}</div>
             </div>
             <div style={{ background:C.bg, borderRadius:RADIUS.md, padding:"12px 16px" }}>
-              <div style={{ fontSize:11, color:C.textLow, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>Nächste mögliche Wellen</div>
+              <div style={{ fontSize:11, color:C.textLow, marginBottom:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>Nächste Wellen</div>
               <div style={{ fontSize:15, fontWeight:700, color:C.textMid }}>{a.nextWaves||"Abwarten"}</div>
             </div>
           </div>
@@ -147,9 +147,12 @@ function FocusModal({ asset: a, onClose }) {
   );
 }
 
+// ── ASSET KARTE ───────────────────────────────────────────────────────────────
 export default function AssetCard({ a }) {
   const [focused, setFocused] = useState(false);
   const bc = BIAS_COL[a.bias] || C.gold;
+  const isMetal = METAL_IDS.includes(a.id);
+  const isCrypto = CRYPTO_IDS.includes(a.id);
 
   return (
     <>
@@ -191,8 +194,7 @@ export default function AssetCard({ a }) {
               display:"inline-flex", alignItems:"center", gap:5,
               background:"transparent", border:`1px solid ${C.blue}44`,
               borderRadius:RADIUS.sm, padding:"6px 12px",
-              color:C.blue, fontSize:11, fontWeight:600, textDecoration:"none",
-              transition:"all 0.15s",
+              color:C.blue, fontSize:11, fontWeight:600, textDecoration:"none", transition:"all 0.15s",
             }}
               onMouseEnter={e=>{ e.currentTarget.style.borderColor=C.blue; e.currentTarget.style.background="#0d1a2a"; }}
               onMouseLeave={e=>{ e.currentTarget.style.borderColor=`${C.blue}44`; e.currentTarget.style.background="transparent"; }}
@@ -200,12 +202,17 @@ export default function AssetCard({ a }) {
           </div>
         </div>
 
-        {/* Live Candlestick Chart */}
+        {/* Chart — Krypto: Live Candlestick, Metalle: Interaktiver Linienchart */}
         <div style={{ border:`1px solid ${C.border}`, borderRadius:RADIUS.md, overflow:"hidden", padding:"6px 2px", background:C.surface }}>
-          <LiveChart assetId={a.id} unit={a.unit} h={240} interval="1h" waveLabels={a.waveLabels} />
+          {isCrypto && (
+            <LiveChart assetId={a.id} unit={a.unit} h={240} interval="1h" waveLabels={a.waveLabels||[]} />
+          )}
+          {isMetal && (
+            <MetalChart assetId={a.id} unit={a.unit} h={240} levels={a.levels||[]} />
+          )}
         </div>
 
-        {/* Wave Label + erster Grund */}
+        {/* Wave + Reason */}
         <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${C.border}` }}>
           <div style={{ fontSize:14, fontWeight:700, color:C.gold, lineHeight:1.4, marginBottom:6 }}>{a.wave}</div>
           {a.reasons?.[0] && (
