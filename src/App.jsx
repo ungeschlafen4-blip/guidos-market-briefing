@@ -4,15 +4,14 @@ import TradeGroup from "./components/TradeCard";
 import NewsCard from "./components/NewsCard";
 import CalendarView from "./components/CalendarView";
 import NewsTicker from "./components/NewsTicker";
-import MacroTile, { MACRO_ASSETS } from "./components/MacroTile_v2";
+import MacroTile, { MACRO_ASSETS } from "./components/MacroTile_v5";
 import { ASSETS } from "./data/assets";
 import { TRADES } from "./data/trades";
 import { NEWS_DEFAULT } from "./data/news";
 import { C, FONT, RADIUS } from "./styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP v6 — Sauber ohne fehlschlagenden AI-API-Call
-// CoinGecko Preise alle 30s · Claude News alle 2h · Statische Trades
+// APP v7 — Trade-Update Button · Saubere Live-Daten
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchCryptoPrices() {
@@ -35,10 +34,7 @@ async function fetchMetalPrices() {
       silver: { price:57.00, chg24:-0.3, chg7:-3.2 },
     };
   } catch {
-    return {
-      gold:   { price:4036, chg24:+0.2, chg7:-5.1 },
-      silver: { price:57.00, chg24:-0.3, chg7:-3.2 },
-    };
+    return { gold:{price:4036,chg24:+0.2,chg7:-5.1}, silver:{price:57.00,chg24:-0.3,chg7:-3.2} };
   }
 }
 
@@ -55,8 +51,8 @@ async function fetchAINews() {
     body: JSON.stringify({
       model:"claude-sonnet-4-6", max_tokens:1500,
       tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:`Suche die wichtigsten aktuellen Krypto- und Finanznews von heute. Antworte NUR mit JSON ohne Backticks.
-JSON: {"news":[{"tag":"KRYPTO oder MAKRO oder AKTIEN","date":"heute Datum","icon":"passendes Emoji","title":"Titel","summary":"1-2 Sätze","full":"Vollständige Analyse mit:\\n\\n📌 Fachbegriffe erklärt:\\n• Begriff: Erklärung\\n\\n📈 Auswirkung:\\nText","impact":"bullisch oder bearisch oder neutral","impactCol":"#2ecc71 oder #e74c3c oder #f0b429"}]}`}],
+      messages:[{role:"user",content:`Suche die wichtigsten aktuellen Krypto- und Finanznews. Antworte NUR mit JSON ohne Backticks.
+JSON: {"news":[{"tag":"KRYPTO oder MAKRO","date":"heute","icon":"Emoji","title":"Titel","summary":"1-2 Sätze","full":"Analyse mit\\n\\n📌 Fachbegriffe:\\n• Begriff: Erklärung\\n\\n📈 Auswirkung:\\nText","impact":"bullisch oder bearisch oder neutral","impactCol":"#2ecc71 oder #e74c3c oder #f0b429"}]}`}],
     }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}`);
@@ -64,8 +60,7 @@ JSON: {"news":[{"tag":"KRYPTO oder MAKRO oder AKTIEN","date":"heute Datum","icon
   const txt = raw.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
   const m = txt.match(/\{[\s\S]*\}/);
   if (!m) throw new Error("Kein JSON");
-  const d = JSON.parse(m[0]);
-  return d.news;
+  return JSON.parse(m[0]).news;
 }
 
 function useIsMobile() {
@@ -131,10 +126,7 @@ export default function App() {
                 Guido's <span style={{color:C.gold}}>Market</span> Briefing
               </h1>
               <div style={{fontSize:13,color:C.textLow,marginTop:6,display:"flex",flexWrap:"wrap",gap:"6px 16px"}}>
-                {lastFetch
-                  ? <><span style={{color:C.bull}}>●</span>{" "}Live: {lastFetch} · Auto 30s</>
-                  : <span style={{color:C.gold}}>⟳ Lade...</span>
-                }
+                {lastFetch ? <><span style={{color:C.bull}}>●</span>{" "}Live: {lastFetch} · Auto 30s</> : <span style={{color:C.gold}}>⟳ Lade...</span>}
                 {newsUpd && <span>🤖 News: {newsUpd}</span>}
                 {priceErr && <span style={{color:C.bear}}>⚠️ {priceErr}</span>}
               </div>
@@ -155,10 +147,8 @@ export default function App() {
           <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
         </header>
 
-        {/* NEWS TICKER */}
         <NewsTicker isMobile={isMobile}/>
 
-        {/* TABS */}
         <div style={{display:"flex",gap:7,marginBottom:24}}>
           {TABS.map(([id,lbl])=>(
             <button key={id} onClick={()=>setTab(id)} style={{
@@ -167,10 +157,7 @@ export default function App() {
               border:tab===id?`1px solid ${C.gold}55`:`1px solid ${C.border}`,
               borderRadius:RADIUS.md,color:tab===id?C.gold:C.textMid,
               fontSize:isMobile?14:16,fontWeight:600,cursor:"pointer",transition:"all 0.15s",
-            }}
-              onMouseEnter={e=>{if(tab!==id){e.currentTarget.style.borderColor=C.borderHi;e.currentTarget.style.color=C.textHi;}}}
-              onMouseLeave={e=>{if(tab!==id){e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.textMid;}}}
-            >{lbl}</button>
+            }}>{lbl}</button>
           ))}
         </div>
 
@@ -178,17 +165,17 @@ export default function App() {
         {tab==="markets"&&(
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:20}}>
             <div>
-              <SLabel>KRYPTO — Binance Live-Kerzen + Elliott-Wellen</SLabel>
+              <SLabel>KRYPTO — 7-Tage Chart · Elliott-Wellen · Klicken für Detail</SLabel>
               <div style={{display:"flex",flexDirection:"column",gap:18}}>
                 {liveAssets.filter(a=>["sol","btc","eth"].includes(a.id)).map(a=><AssetCard key={a.id} a={a}/>)}
               </div>
             </div>
             <div>
-              <SLabel>ROHSTOFFE — Live-Preise + 7-Tage-Chart</SLabel>
+              <SLabel>ROHSTOFFE — Live-Preise · 7-Tage Chart</SLabel>
               <div style={{display:"flex",flexDirection:"column",gap:18,marginBottom:28}}>
                 {liveAssets.filter(a=>["gold","silver"].includes(a.id)).map(a=><AssetCard key={a.id} a={a}/>)}
               </div>
-              <SLabel>MAKRO — Klicken für TradingView Chart</SLabel>
+              <SLabel>MAKRO — 7-Tage Chart · Analyse · TradingView</SLabel>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 {MACRO_ASSETS.map(m=><MacroTile key={m.n} m={m}/>)}
               </div>
@@ -199,12 +186,38 @@ export default function App() {
         {/* TRADES */}
         {tab==="trades"&&(
           <div>
-            <div style={{background:C.surface,border:`1px solid ${C.gold}33`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:20,fontSize:15,color:C.textMid,lineHeight:1.65}}>
-              <span style={{color:C.gold,fontWeight:700}}>Cross-Check · keine Empfehlung. </span>
-              SOL (⭐) → Gold (💡) → BTC (⏸) → ETH (⛔). 1H/2H Setups mit Confluence. Beim nächsten Update schick mir einfach "Update" im Chat.
+            {/* Update Banner */}
+            <div style={{
+              background:C.surface, border:`1px solid ${C.gold}44`,
+              borderRadius:RADIUS.md, padding:"16px 20px", marginBottom:20,
+              display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12,
+            }}>
+              <div>
+                <div style={{fontSize:15,color:C.textHi,fontWeight:600,marginBottom:4}}>
+                  〰️ Elliott-Wave Trade-Setups — Stand: 29. Juni 2026
+                </div>
+                <div style={{fontSize:13,color:C.textMid}}>
+                  Klick auf <strong style={{color:C.gold}}>「〰️ Übergeordnete Struktur」</strong> für Wellen-Vorschau + 4-Wochen-Chart pro Asset.
+                  Für neue Setups: schick mir <strong style={{color:C.gold}}>"Update Trades"</strong> im Claude-Chat.
+                </div>
+              </div>
+              <a
+                href="https://claude.ai/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display:"inline-flex", alignItems:"center", gap:8,
+                  background:C.gold, color:C.bg, textDecoration:"none",
+                  padding:"10px 18px", borderRadius:RADIUS.md,
+                  fontSize:13, fontWeight:800, letterSpacing:"0.02em",
+                  flexShrink:0,
+                }}>
+                🤖 Trades updaten →
+              </a>
             </div>
+
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:18}}>
-              {TRADES.map(g=><TradeGroup key={g.asset} g={g}/>)}
+              {TRADES.map((g,i)=><TradeGroup key={g.asset||i} g={g}/>)}
             </div>
           </div>
         )}
@@ -238,7 +251,8 @@ export default function App() {
         )}
 
         <div style={{marginTop:40,fontSize:12,color:C.textLow,textAlign:"center",lineHeight:2}}>
-          Binance Live-Kerzen · CoinGecko Preise · Claude AI News · keine Anlageberatung
+          CoinGecko Preise · Claude AI News · Elliott-Wave Analysis · keine Anlageberatung<br/>
+          Trades updaten: schick "Update Trades" im Claude-Chat → neue Setups in 2 Minuten
         </div>
       </div>
     </div>
