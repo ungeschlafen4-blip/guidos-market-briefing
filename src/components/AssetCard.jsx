@@ -5,8 +5,9 @@ import { C, FONT, RADIUS, BIAS_COL, DIR_ICON } from "../styles/theme";
 import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ASSET CARD v8
-// Detail-Modal mit 3 Tabs: Kurzfristig · Langfristig (Weekly 6 Monate) · TV-Links
+// ASSET CARD v9 — Elliott-Wellen-Analyse jetzt AUCH im 7-Tage (kurzfristig) Tab
+// Vorher nur im Weekly-Tab. Jetzt: kurzfristige Welle (a.wave/a.waveDetail)
+// wird zusätzlich unter dem 7-Tage-Chart angezeigt.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function WeeklyChart({ data, levels=[], unit="$", h=380 }) {
@@ -48,6 +49,30 @@ function WeeklyChart({ data, levels=[], unit="$", h=380 }) {
   );
 }
 
+// ── ELLIOTT-WELLEN-BOX — wiederverwendbar für kurz- UND langfristig ─────────
+function WaveBox({ currentWave, waveStructure, nextWaves, waveDetail, title="Elliott-Wellen-Position" }) {
+  return (
+    <div style={{background:C.surface,border:`1px solid ${C.gold}33`,borderRadius:RADIUS.lg,padding:"18px 22px",marginBottom:18}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+        <span style={{fontSize:20}}>〰️</span>
+        <span style={{fontSize:15,fontWeight:800,color:C.gold}}>{title}</span>
+        {waveStructure && <span style={{fontSize:13,color:C.textMid,marginLeft:"auto"}}>{waveStructure}</span>}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div style={{background:C.bg,borderRadius:RADIUS.md,padding:"12px 16px"}}>
+          <div style={{fontSize:11,color:C.textLow,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Aktuelle Welle</div>
+          <div style={{fontSize:22,fontWeight:800,color:C.gold,fontFamily:FONT.mono}}>{currentWave||"?"}</div>
+        </div>
+        <div style={{background:C.bg,borderRadius:RADIUS.md,padding:"12px 16px"}}>
+          <div style={{fontSize:11,color:C.textLow,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Nächste Szenarien</div>
+          <div style={{fontSize:14,fontWeight:700,color:C.textMid}}>{nextWaves||"Abwarten"}</div>
+        </div>
+      </div>
+      <p style={{fontSize:14,color:C.textMid,lineHeight:1.8,margin:0}}>{waveDetail}</p>
+    </div>
+  );
+}
+
 function FocusModal({ asset: a, onClose }) {
   const [view, setView] = useState("short");
   const bc = BIAS_COL[a.bias] || C.gold;
@@ -79,7 +104,7 @@ function FocusModal({ asset: a, onClose }) {
           </div>
         </div>
 
-        {/* Tabs: Kurzfristig · Langfristig · TV-Links */}
+        {/* Tabs */}
         <div style={{display:"flex",gap:6,marginBottom:14}}>
           {[
             ["short","📊 Kurzfristig (7 Tage)"],
@@ -96,10 +121,20 @@ function FocusModal({ asset: a, onClose }) {
           ))}
         </div>
 
-        {/* KURZFRISTIG — 7 Tage */}
+        {/* KURZFRISTIG — 7 Tage + Wellen-Analyse JETZT MIT DABEI */}
         {view==="short" && (
-          <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"8px 4px",background:C.surface,marginBottom:18}}>
-            <UnifiedChart assetId={a.id} unit={a.unit} h={360} levels={a.levels||[]} currentPrice={a.price}/>
+          <div>
+            <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"8px 4px",background:C.surface,marginBottom:16}}>
+              <UnifiedChart assetId={a.id} unit={a.unit} h={360} levels={a.levels||[]} currentPrice={a.price}/>
+            </div>
+            {/* NEU: Elliott-Wellen-Box auch im kurzfristigen Tab */}
+            <WaveBox
+              title="Kurzfristige Elliott-Wellen-Position (1H/4H)"
+              currentWave={a.currentWave}
+              waveStructure={a.wave?.split("—")[0]?.trim()}
+              nextWaves={a.nextWaves}
+              waveDetail={a.waveDetail}
+            />
           </div>
         )}
 
@@ -109,31 +144,19 @@ function FocusModal({ asset: a, onClose }) {
             <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"8px 4px",background:C.surface,marginBottom:16}}>
               <WeeklyChart data={a.pathWeekly} levels={a.levelsWeekly||[]} unit={a.unit} h={380}/>
             </div>
-            {/* Elliott-Wellen-Analyse für Weekly */}
-            <div style={{background:C.surface,border:`1px solid ${C.gold}33`,borderRadius:RADIUS.lg,padding:"18px 22px",marginBottom:16}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                <span style={{fontSize:20}}>〰️</span>
-                <span style={{fontSize:15,fontWeight:800,color:C.gold}}>Übergeordnete Elliott-Struktur (Weekly)</span>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-                <div style={{background:C.bg,borderRadius:RADIUS.md,padding:"12px 16px"}}>
-                  <div style={{fontSize:11,color:C.textLow,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Aktuelle Welle</div>
-                  <div style={{fontSize:22,fontWeight:800,color:C.gold,fontFamily:FONT.mono}}>{a.currentWave||"?"}</div>
-                </div>
-                <div style={{background:C.bg,borderRadius:RADIUS.md,padding:"12px 16px"}}>
-                  <div style={{fontSize:11,color:C.textLow,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Nächste Szenarien</div>
-                  <div style={{fontSize:14,fontWeight:700,color:C.textMid}}>{a.nextWaves||"Abwarten"}</div>
-                </div>
-              </div>
-              <p style={{fontSize:14,color:C.textMid,lineHeight:1.8,margin:0}}>{a.waveWeekly||a.waveDetail}</p>
-            </div>
+            <WaveBox
+              title="Übergeordnete Elliott-Struktur (Weekly)"
+              currentWave={a.currentWave}
+              waveStructure={a.waveStructure}
+              nextWaves={a.nextWaves}
+              waveDetail={a.waveWeekly||a.waveDetail}
+            />
           </div>
         )}
 
         {/* TV-LINKS */}
         {view==="tv" && (
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-            {/* Kurzfristiger Chart */}
             <div style={{background:C.surface,borderRadius:RADIUS.lg,border:`1px solid ${C.blue}44`,padding:"28px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center"}}>
               <span style={{fontSize:36}}>⚡</span>
               <div>
@@ -146,7 +169,6 @@ function FocusModal({ asset: a, onClose }) {
                 }}>📊 Öffnen →</a>
               </div>
             </div>
-            {/* Langfristiger Chart */}
             <div style={{background:C.surface,borderRadius:RADIUS.lg,border:`1px solid ${C.gold}44`,padding:"28px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center"}}>
               <span style={{fontSize:36}}>📈</span>
               <div>
@@ -162,7 +184,7 @@ function FocusModal({ asset: a, onClose }) {
           </div>
         )}
 
-        {/* Warum steigt/fällt — immer sichtbar außer bei TV */}
+        {/* Warum steigt/fällt — außer bei TV */}
         {view!=="tv" && (
           <div style={{background:C.surface,border:`1px solid ${dirReason.color}33`,borderRadius:RADIUS.lg,padding:"18px 22px",marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
@@ -213,7 +235,6 @@ export default function AssetCard({ a }) {
         onMouseEnter={e=>e.currentTarget.style.borderColor=bc}
         onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}
       >
-        {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
@@ -251,12 +272,10 @@ export default function AssetCard({ a }) {
           </div>
         </div>
 
-        {/* 7-Tage Chart */}
         <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"6px 2px",background:C.surface}}>
           <UnifiedChart assetId={a.id} unit={a.unit} h={220} levels={a.levels||[]} currentPrice={a.price}/>
         </div>
 
-        {/* Wave + Reason */}
         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
           <div style={{fontSize:14,fontWeight:700,color:C.gold,lineHeight:1.4,marginBottom:6}}>{a.wave}</div>
           {a.reasons?.[0] && (
