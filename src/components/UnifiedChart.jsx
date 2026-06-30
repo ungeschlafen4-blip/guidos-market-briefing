@@ -87,20 +87,17 @@ function ChartTooltip({ active, payload, label, unit, decimals }) {
 
 export default function UnifiedChart({ assetId, unit="$", h=240, levels=[], color, currentPrice }) {
   const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
   const isCrypto = !!BINANCE_SYMBOL[assetId];
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
-    setError(null);
 
     if (isCrypto) {
       fetchBinanceHistory(BINANCE_SYMBOL[assetId])
         .then(d => { if (!cancelled) setData(d); })
-        .catch(e => {
+        .catch(() => {
           if (!cancelled) {
-            setError(e.message);
             // Fallback: simulierte Daten falls Binance nicht erreichbar
             const cfg = { start: 60000, end: 60000, vol: 200, seed: 1 };
             setData(genSimulatedPath(cfg.start, cfg.end, cfg.vol, cfg.seed));
