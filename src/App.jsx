@@ -7,7 +7,7 @@ import NewsTicker from "./components/NewsTicker";
 import DashboardLogo from "./components/DashboardLogo";
 import SplashScreen from "./components/SplashScreen";
 import VoiceAssistant from "./components/VoiceAssistant";
-import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v5";
+import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v2";
 import { ASSETS, TOTAL_MARKET_CAP_LINK } from "./data/assets";
 import { TRADES as DEFAULT_TRADES } from "./data/trades";
 import { NEWS_DEFAULT } from "./data/news";
