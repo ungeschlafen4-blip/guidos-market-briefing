@@ -81,8 +81,6 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[], colo
 
   // Dezimalstellen je nach Asset
   const decimals = assetId==="us10y" ? 2 : assetId==="vix"||assetId==="sol"||assetId==="silver" ? 2 : assetId==="wti"||assetId==="dxy" ? 2 : 0;
-  const lineColor = color || (assetId==="gold"?C.gold:assetId==="silver"?C.textMid:C.blue);
-
   const start = data[0];
   const end   = data[data.length-1];
   const isUp  = end.p >= start.p;
