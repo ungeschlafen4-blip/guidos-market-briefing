@@ -7,6 +7,7 @@ import NewsTicker from "./components/NewsTicker";
 import DashboardLogo from "./components/DashboardLogo";
 import SplashScreen from "./components/SplashScreen";
 import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v2";
+import VoiceAssistant from "./components/VoiceAssistant";
 import { ASSETS, TOTAL_MARKET_CAP_LINK } from "./data/assets";
 import { TRADES as DEFAULT_TRADES } from "./data/trades";
 import { NEWS_DEFAULT } from "./data/news";
@@ -105,6 +106,7 @@ function splitIntoColumns(items, columns = 2) {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const [showAssistant, setShowAssistant] = useState(false);
   const isMobile = useIsMobile();
   const [tab,setTab]=useState("markets");
   const [news,setNews]=useState(NEWS_DEFAULT);
@@ -179,6 +181,7 @@ export default function App() {
   return (
     <>
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {showAssistant && <VoiceAssistant onClose={() => setShowAssistant(false)} />}
 
       <div style={{minHeight:"100vh",background:C.bg,color:C.textHi,fontFamily:FONT.sans}}>
         <div style={{maxWidth:1500,margin:"0 auto",padding:isMobile?"14px 14px 60px":"28px 50px 60px"}}>
@@ -202,6 +205,13 @@ export default function App() {
                   style={{display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
                   🔗 {isMobile?"MCO":"MCO Terminal"}
                 </a>
+                <button onClick={() => setShowAssistant(true)} style={{
+                  display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.bull}55`,
+                  borderRadius:RADIUS.md,padding:"9px 14px",color:C.bull,fontSize:12,fontWeight:700,
+                  cursor:"pointer",
+                }}>
+                  🎙️ {isMobile?"":"Assistentin"}
+                </button>
               </div>
             </div>
             {priceErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#160606",border:`1px solid ${C.bear}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.bear}}>⚠️ {priceErr}</div>}
