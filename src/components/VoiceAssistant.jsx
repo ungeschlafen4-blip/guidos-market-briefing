@@ -2,248 +2,342 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { C, FONT, RADIUS } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VOICE ASSISTANT — "Jarvis"-Stil Sprachassistent für Markt-News
-// - Begrüßt automatisch beim Öffnen mit "Was gibt's Neues?"
-// - Antwortet per Sprachausgabe (Browser SpeechSynthesis, weibliche Stimme)
-// - Mikrofon-Eingabe per Browser SpeechRecognition (Chrome/Edge unterstützt das gut,
-//   Safari/Firefox eingeschränkter — Fallback ist immer das Textfeld)
+// VOICE ASSISTANT v2 — Iron-Man-Style
+// Animierter Orb: Punkte vibrieren wenn die Assistentin spricht
+// Öffnet als Vollbild-Overlay wenn der Tab gedrückt wird
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Weibliche deutsche Stimme finden ──────────────────────────────────────────
-function findGermanFemaleVoice() {
+// ── Weibliche deutsche Stimme ────────────────────────────────────────────────
+function getBestVoice() {
   const voices = window.speechSynthesis?.getVoices() || [];
-  // Bevorzugt: deutsche Stimme mit weiblich klingendem Namen
-  const femaleNames = ["female", "anna", "petra", "helena", "martina", "katja", "google deutsch"];
-  const german = voices.filter(v => v.lang?.toLowerCase().startsWith("de"));
-  const femaleMatch = german.find(v => femaleNames.some(n => v.name.toLowerCase().includes(n)));
-  return femaleMatch || german[0] || voices[0] || null;
+  const pref = ["google deutsch", "anna", "helena", "petra", "female", "google de"];
+  const de = voices.filter(v => v.lang?.toLowerCase().startsWith("de"));
+  return de.find(v => pref.some(p => v.name.toLowerCase().includes(p))) || de[0] || voices[0] || null;
 }
 
-function speak(text, onEnd) {
+function speak(text, onStart, onEnd) {
   if (!window.speechSynthesis) { onEnd?.(); return; }
-  window.speechSynthesis.cancel(); // vorherige Sprache abbrechen falls noch läuft
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "de-DE";
-  utterance.rate = 1.0;
-  utterance.pitch = 1.05; // leicht höher = klingt tendenziell weiblicher
-  const voice = findGermanFemaleVoice();
-  if (voice) utterance.voice = voice;
-  utterance.onend = () => onEnd?.();
-  utterance.onerror = () => onEnd?.();
-  window.speechSynthesis.speak(utterance);
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "de-DE";
+  u.rate = 0.95;
+  u.pitch = 1.1;
+  // Stimmen evtl. noch nicht geladen — kurz warten
+  const setVoice = () => { const v = getBestVoice(); if (v) u.voice = v; };
+  setVoice();
+  u.onstart = () => onStart?.();
+  u.onend   = () => onEnd?.();
+  u.onerror = () => onEnd?.();
+  window.speechSynthesis.speak(u);
 }
 
-// ── Mikrofon-Spracherkennung (falls vom Browser unterstützt) ─────────────────
-function getSpeechRecognition() {
+// ── Animierter Orb ────────────────────────────────────────────────────────────
+const ORB_DOTS = 24;
+function AssistantOrb({ speaking, loading }) {
+  const canvasRef = useRef(null);
+  const animRef = useRef(null);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const size = 240;
+    canvas.width = size;
+    canvas.height = size;
+    const cx = size / 2, cy = size / 2, r = 80;
+
+    const draw = () => {
+      timeRef.current += 0.03;
+      const t = timeRef.current;
+      ctx.clearRect(0, 0, size, size);
+
+      // Hintergrund-Glow
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.4);
+      grad.addColorStop(0, speaking ? "rgba(46,204,113,0.08)" : "rgba(255,255,255,0.04)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Orb-Ring
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = speaking ? "rgba(46,204,113,0.3)" : "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Punkte auf dem Ring
+      for (let i = 0; i < ORB_DOTS; i++) {
+        const angle = (i / ORB_DOTS) * Math.PI * 2;
+        const wave = speaking
+          ? Math.sin(t * 3 + i * 0.8) * 12 + Math.sin(t * 5 + i * 1.3) * 6
+          : loading
+          ? Math.sin(t * 2 + i * 0.5) * 4
+          : Math.sin(t * 0.8 + i * 0.4) * 2;
+
+        const dotR = r + wave;
+        const x = cx + Math.cos(angle) * dotR;
+        const y = cy + Math.sin(angle) * dotR;
+
+        // Farbe der Punkte — Regenbogen-Spektrum im speaking-Modus, sonst Graustufen
+        let hue, sat, lit;
+        if (speaking) {
+          hue = (i / ORB_DOTS) * 360 + t * 40;
+          sat = 80;
+          lit = 55 + Math.sin(t * 4 + i) * 15;
+        } else if (loading) {
+          hue = 140;
+          sat = 60;
+          lit = 40 + Math.sin(t * 3 + i) * 10;
+        } else {
+          hue = 0;
+          sat = 0;
+          lit = 25 + Math.sin(t + i * 0.3) * 8;
+        }
+
+        const dotSize = speaking ? 3 + Math.abs(wave) / 6 : 2.5;
+        ctx.beginPath();
+        ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${hue},${sat}%,${lit}%)`;
+        ctx.fill();
+      }
+
+      // Mittlerer Puls
+      const innerR = speaking ? 20 + Math.sin(t * 5) * 8 : 14;
+      const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerR * 1.5);
+      innerGrad.addColorStop(0, speaking ? "rgba(46,204,113,0.6)" : "rgba(200,200,200,0.2)");
+      innerGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerR * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = innerGrad;
+      ctx.fill();
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animRef.current);
+  }, [speaking, loading]);
+
+  return (
+    <canvas ref={canvasRef} style={{ width:240, height:240, display:"block" }}/>
+  );
+}
+
+// ── Spracherkennung ──────────────────────────────────────────────────────────
+function getSpeechRec() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
-  const rec = new SR();
-  rec.lang = "de-DE";
-  rec.continuous = false;
-  rec.interimResults = false;
-  return rec;
+  const r = new SR();
+  r.lang = "de-DE";
+  r.continuous = false;
+  r.interimResults = false;
+  return r;
 }
 
-async function askAssistant(message, history) {
+async function callAssistant(message, history) {
   const res = await fetch("/api/assistant", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, history }),
   });
-  if (!res.ok) throw new Error(`Assistant ${res.status}`);
   const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data.reply;
 }
 
+// ── Hauptkomponente ──────────────────────────────────────────────────────────
 export default function VoiceAssistant({ onClose }) {
-  const [messages, setMessages] = useState([]); // {role:"user"|"assistant", content}
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
+  const [micSupported] = useState(() => !!(window.SpeechRecognition || window.webkitSpeechRecognition));
   const [error, setError] = useState(null);
-  const recognitionRef = useRef(null);
   const scrollRef = useRef(null);
-  const hasGreetedRef = useRef(false);
+  const hasGreeted = useRef(false);
+  const recRef = useRef(null);
 
-  // ── Automatische Begrüßung beim ersten Öffnen ──────────────────────────────
-  const sendMessage = useCallback(async (text) => {
-    if (!text.trim()) return;
-    setError(null);
-    const userMsg = { role: "user", content: text };
-    setMessages(prev => [...prev, userMsg]);
-    setLoading(true);
-
-    try {
-      const history = messages.map(m => ({ role: m.role, content: m.content }));
-      const reply = await askAssistant(text, history);
-      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
-      setSpeaking(true);
-      speak(reply, () => setSpeaking(false));
-    } catch (e) {
-      setError("Verbindung fehlgeschlagen — Backend evtl. noch nicht eingerichtet");
-    } finally {
-      setLoading(false);
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (!hasGreetedRef.current) {
-      hasGreetedRef.current = true;
-      sendMessage("Was gibt's Neues?");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  // Stimmen-Liste laden (manche Browser laden sie asynchron nach)
+  // Stimmen vorladen
   useEffect(() => {
     if (window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = () => {};
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
     return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
-  const handleSend = () => {
-    const text = input.trim();
-    if (!text) return;
-    setInput("");
-    sendMessage(text);
-  };
-
-  const handleMicClick = () => {
-    const rec = getSpeechRecognition();
-    if (!rec) {
-      setError("Mikrofon-Spracheingabe wird von diesem Browser nicht unterstützt — bitte tippen");
-      return;
+  const sendMessage = useCallback(async (text) => {
+    if (!text.trim() || loading) return;
+    setError(null);
+    window.speechSynthesis?.cancel();
+    setSpeaking(false);
+    setMessages(prev => [...prev, { role:"user", content:text }]);
+    setLoading(true);
+    try {
+      const hist = messages.map(m => ({ role:m.role, content:m.content }));
+      const reply = await callAssistant(text, hist);
+      setMessages(prev => [...prev, { role:"assistant", content:reply }]);
+      setLoading(false);
+      setSpeaking(true);
+      speak(reply, () => setSpeaking(true), () => setSpeaking(false));
+    } catch(e) {
+      setError(e.message);
+      setLoading(false);
     }
-    recognitionRef.current = rec;
+  }, [messages, loading]);
+
+  // Auto-Begrüßung
+  useEffect(() => {
+    if (!hasGreeted.current) {
+      hasGreeted.current = true;
+      setTimeout(() => sendMessage("Was gibt es Neues an den Märkten heute?"), 800);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior:"smooth" });
+  }, [messages]);
+
+  const handleMic = () => {
+    if (listening) { recRef.current?.stop(); return; }
+    const rec = getSpeechRec();
+    if (!rec) return;
+    recRef.current = rec;
     setListening(true);
-    rec.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
+    rec.onresult = e => {
+      const t = e.results[0][0].transcript;
       setListening(false);
-      sendMessage(transcript);
+      setInput("");
+      sendMessage(t);
     };
     rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onend   = () => setListening(false);
     rec.start();
   };
 
-  const stopSpeaking = () => {
-    window.speechSynthesis?.cancel();
-    setSpeaking(false);
+  const handleSend = () => {
+    const t = input.trim();
+    if (!t) return;
+    setInput("");
+    sendMessage(t);
   };
+
+  const statusText = speaking ? "spricht..." : listening ? "hört zu..." : loading ? "sucht Infos..." : "bereit";
+  const statusColor = speaking ? C.bull : listening ? "#f0b429" : loading ? C.textMid : C.textLow;
 
   return (
     <div style={{
       position:"fixed", inset:0, zIndex:1000,
-      background:"rgba(0,0,0,0.92)",
-      backdropFilter:"blur(10px)",
-      display:"flex", alignItems:"center", justifyContent:"center",
-      padding:20,
+      background:"rgba(0,0,0,0.95)",
+      backdropFilter:"blur(16px)",
+      display:"flex", flexDirection:"column",
+      alignItems:"center", justifyContent:"space-between",
+      padding:"40px 20px 24px",
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
-        width:"100%", maxWidth:640, height:"min(720px, 85vh)",
-        background:C.card, border:`1px solid ${C.borderHi}`,
-        borderRadius:RADIUS.xl, display:"flex", flexDirection:"column",
-        boxShadow:"0 24px 80px rgba(0,0,0,0.8)", overflow:"hidden",
+        width:"100%", maxWidth:680,
+        display:"flex", flexDirection:"column", alignItems:"center",
+        gap:0, height:"100%",
       }}>
         {/* Header */}
-        <div style={{ padding:"20px 24px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:14 }}>
-          <div style={{
-            width:44, height:44, borderRadius:"50%",
-            background: speaking ? "linear-gradient(135deg,#2ecc71,#1a8a4a)" : "linear-gradient(135deg,#1a1a1a,#000000)",
-            border:`2px solid ${speaking?C.bull:C.borderHi}`,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            transition:"all 0.3s ease",
-            animation: speaking ? "voicePulse 1s ease-in-out infinite" : "none",
-            flexShrink:0,
-          }}>
-            <span style={{ fontSize:20 }}>{speaking ? "🔊" : "🎙️"}</span>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontFamily:FONT.serif, fontSize:18, fontWeight:700, color:C.textHi }}>Markt-Assistentin</div>
-            <div style={{ fontSize:12, color: speaking ? C.bull : listening ? C.gold : C.textLow }}>
-              {speaking ? "spricht..." : listening ? "hört zu..." : loading ? "denkt nach..." : "bereit"}
+        <div style={{ width:"100%", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:32 }}>
+          <div>
+            <div style={{ fontFamily:FONT.serif, fontSize:22, fontWeight:700, color:C.textHi, letterSpacing:"0.05em" }}>
+              Markt-Assistentin
+            </div>
+            <div style={{ fontSize:13, color:statusColor, marginTop:4, transition:"color 0.3s" }}>
+              {statusText}
             </div>
           </div>
-          {speaking && (
-            <button onClick={stopSpeaking} style={{
-              background:C.surface, border:`1px solid ${C.border}`, borderRadius:RADIUS.sm,
-              padding:"6px 12px", color:C.textMid, fontSize:12, fontWeight:600, cursor:"pointer",
-            }}>⏸ Stumm</button>
-          )}
           <button onClick={onClose} style={{
             background:C.surface, border:`1px solid ${C.border}`, borderRadius:RADIUS.sm,
-            width:36, height:36, color:C.textMid, fontSize:18, cursor:"pointer",
+            width:38, height:38, color:C.textMid, fontSize:18, cursor:"pointer",
+            display:"flex", alignItems:"center", justifyContent:"center",
           }}>✕</button>
         </div>
 
+        {/* Orb */}
+        <div style={{ marginBottom:28 }}>
+          <AssistantOrb speaking={speaking} loading={loading} />
+        </div>
+
         {/* Chat-Verlauf */}
-        <div ref={scrollRef} style={{ flex:1, overflowY:"auto", padding:"20px 24px", display:"flex", flexDirection:"column", gap:14 }}>
-          {messages.map((m, i) => (
+        <div ref={scrollRef} style={{
+          width:"100%", flex:1, overflowY:"auto", marginBottom:20,
+          display:"flex", flexDirection:"column", gap:12,
+          maxHeight:"30vh",
+        }}>
+          {messages.map((m,i) => (
             <div key={i} style={{
-              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+              alignSelf: m.role==="user" ? "flex-end" : "flex-start",
               maxWidth:"85%",
-              background: m.role === "user" ? C.surface : C.bg,
-              border:`1px solid ${C.border}`,
-              borderRadius:RADIUS.lg,
-              padding:"12px 16px",
+              background: m.role==="user" ? "rgba(255,255,255,0.06)" : "rgba(46,204,113,0.06)",
+              border:`1px solid ${m.role==="user"?C.border:"rgba(46,204,113,0.2)"}`,
+              borderRadius:RADIUS.lg, padding:"10px 14px",
             }}>
-              <div style={{ fontSize:11, color:C.textLow, marginBottom:5, fontWeight:700 }}>
-                {m.role === "user" ? "Du" : "Assistentin"}
+              <div style={{ fontSize:10, color:C.textLow, marginBottom:4, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em" }}>
+                {m.role==="user" ? "Du" : "Assistentin"}
               </div>
-              <div style={{ fontSize:14, color:C.textHi, lineHeight:1.6 }}>{m.content}</div>
+              <div style={{ fontSize:14, color:C.textHi, lineHeight:1.65 }}>{m.content}</div>
             </div>
           ))}
           {loading && (
-            <div style={{ alignSelf:"flex-start", fontSize:13, color:C.textLow, display:"flex", alignItems:"center", gap:8 }}>
-              <span style={{ animation:"spin 1s linear infinite", display:"inline-block" }}>⟳</span> sucht aktuelle Infos...
+            <div style={{ alignSelf:"flex-start", fontSize:13, color:C.textLow, display:"flex", gap:8, alignItems:"center" }}>
+              <span style={{ animation:"spin 1s linear infinite", display:"inline-block" }}>⟳</span> sucht aktuelle Infos im Web...
             </div>
           )}
           {error && (
-            <div style={{ alignSelf:"flex-start", fontSize:13, color:C.bear, background:"#160606", border:`1px solid ${C.bear}44`, borderRadius:RADIUS.md, padding:"10px 14px" }}>
+            <div style={{ alignSelf:"flex-start", fontSize:12, color:C.bear, background:"#160606", border:`1px solid ${C.bear}33`, borderRadius:RADIUS.md, padding:"10px 14px", maxWidth:"90%" }}>
               ⚠️ {error}
             </div>
           )}
         </div>
 
         {/* Eingabe */}
-        <div style={{ padding:"16px 20px", borderTop:`1px solid ${C.border}`, display:"flex", gap:10, alignItems:"center" }}>
-          <button onClick={handleMicClick} disabled={listening || loading} style={{
-            width:44, height:44, borderRadius:"50%", flexShrink:0,
-            background: listening ? C.bull : C.surface,
-            border:`1px solid ${listening?C.bull:C.border}`,
-            color: listening ? "#000" : C.textMid,
-            fontSize:18, cursor: listening||loading ? "wait" : "pointer",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            transition:"all 0.2s",
-          }}>🎤</button>
+        <div style={{ width:"100%", display:"flex", gap:10, alignItems:"center" }}>
+          {micSupported && (
+            <button onClick={handleMic} style={{
+              width:48, height:48, borderRadius:"50%", flexShrink:0,
+              background: listening ? C.bull : "rgba(255,255,255,0.06)",
+              border:`1px solid ${listening?C.bull:C.border}`,
+              color: listening ? "#000" : C.textMid,
+              fontSize:20, cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              transition:"all 0.2s",
+              animation: listening ? "micPulse 1s ease-in-out infinite" : "none",
+            }}>🎤</button>
+          )}
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") handleSend(); }}
-            placeholder="Frag nach Details, oder nutz das Mikrofon..."
+            onKeyDown={e => e.key==="Enter" && handleSend()}
+            placeholder={micSupported ? "Tippen oder Mikrofon..." : "Frag nach Details..."}
             style={{
-              flex:1, background:C.surface, border:`1px solid ${C.border}`,
-              borderRadius:RADIUS.md, padding:"12px 16px", color:C.textHi,
+              flex:1, background:"rgba(255,255,255,0.06)", border:`1px solid ${C.border}`,
+              borderRadius:RADIUS.md, padding:"13px 16px", color:C.textHi,
               fontSize:14, outline:"none",
+              fontFamily:FONT.sans,
             }}
           />
-          <button onClick={handleSend} disabled={loading || !input.trim()} style={{
-            background:C.textHi, color:C.bg, border:"none", borderRadius:RADIUS.md,
-            padding:"12px 20px", fontSize:14, fontWeight:700, cursor: loading?"wait":"pointer",
-            opacity: !input.trim() ? 0.4 : 1,
+          <button onClick={handleSend} disabled={!input.trim() || loading} style={{
+            background: input.trim() ? C.bull : "rgba(255,255,255,0.08)",
+            color: input.trim() ? "#000" : C.textLow,
+            border:"none", borderRadius:RADIUS.md,
+            padding:"13px 20px", fontSize:14, fontWeight:700, cursor: input.trim()?"pointer":"default",
+            transition:"all 0.2s",
+            flexShrink:0,
           }}>Senden</button>
         </div>
       </div>
 
       <style>{`
-        @keyframes voicePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(46,204,113,0.5); } 50% { box-shadow: 0 0 0 10px rgba(46,204,113,0); } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes spin { from{transform:rotate(0)}to{transform:rotate(360deg)} }
+        @keyframes micPulse { 0%,100%{box-shadow:0 0 0 0 rgba(46,204,113,0.5)} 50%{box-shadow:0 0 0 10px rgba(46,204,113,0)} }
       `}</style>
     </div>
   );
