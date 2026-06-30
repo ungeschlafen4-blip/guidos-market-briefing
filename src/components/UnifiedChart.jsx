@@ -3,19 +3,16 @@ import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianG
 import { C, FONT, RADIUS } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UNIFIED CHART v3
-// - Krypto: echte Binance-Historie (REST, kein Key)
-// - Gold/Silber/Makro: echte Yahoo-Finance-Historie via CORS-Proxy
-// - Kein hartes Überschreiben des letzten Punkts mehr (das verursachte den "Sprung")
-//   Stattdessen: Live-Preis wird nur als zusätzlicher, klar markierter Punkt angehängt
-//   wenn er sich sinnvoll an die Historie anschließt — sonst wird die echte Historie
-//   unverändert gezeigt, damit die Kurvenform nicht verzerrt wird.
+// UNIFIED CHART v4
+// - Krypto: echte Binance-Historie direkt (Binance erlaubt CORS, kein Proxy nötig)
+// - Gold/Silber/Makro: echte Yahoo-Historie über UNSEREN EIGENEN Proxy (/api/yahoo-proxy)
+//   statt des unzuverlässigen Drittanbieters allorigins.win
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BINANCE_SYMBOL = { btc: "BTCUSDT", eth: "ETHUSDT", sol: "SOLUSDT" };
 const YAHOO_SYMBOL = {
-  gold:   "GC=F",      // Gold Futures
-  silver: "SI=F",      // Silber Futures
+  gold:   "GC=F",
+  silver: "SI=F",
   spx:    "^GSPC",
   ndx:    "^NDX",
   wti:    "CL=F",
@@ -27,7 +24,6 @@ const YAHOO_SYMBOL = {
 const DAY_LABELS = ["So","Mo","Di","Mi","Do","Fr","Sa"];
 function formatDayLabel(date) { return DAY_LABELS[date.getDay()]; }
 
-// ── BINANCE: echte Krypto-Historie ────────────────────────────────────────────
 async function fetchBinanceHistory(symbol) {
   const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=3h&limit=56`);
   if (!res.ok) throw new Error(`Binance ${res.status}`);
@@ -41,12 +37,11 @@ async function fetchBinanceHistory(symbol) {
   });
 }
 
-// ── YAHOO FINANCE: echte Historie für Gold/Silber/Makro ──────────────────────
+// ── Eigener Proxy statt allorigins.win ────────────────────────────────────────
 async function fetchYahooHistory(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1h&range=7d`;
-  const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  const res = await fetch(proxied);
-  if (!res.ok) throw new Error(`Yahoo ${res.status}`);
+  const url = `/api/yahoo-proxy?symbol=${encodeURIComponent(symbol)}&range=7d&interval=1h`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Proxy ${res.status}`);
   const data = await res.json();
   const result = data?.chart?.result?.[0];
   if (!result) throw new Error("Keine Yahoo-Daten");
@@ -57,7 +52,7 @@ async function fetchYahooHistory(symbol) {
   let lastDate = null;
   const points = [];
   for (let i = 0; i < timestamps.length; i++) {
-    if (closes[i] === null || closes[i] === undefined) continue; // Marktschluss-Lücken überspringen
+    if (closes[i] === null || closes[i] === undefined) continue;
     const date = new Date(timestamps[i] * 1000);
     const isNewDay = lastDate === null || lastDate.getDate() !== date.getDate();
     lastDate = date;
@@ -99,7 +94,7 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
           const d = await fetchBinanceHistory(BINANCE_SYMBOL[assetId]);
           if (!cancelled) { setData(d); setIsLive(true); }
           return;
-        } catch { /* fällt durch zu Fehlerzustand unten */ }
+        } catch { /* fällt durch */ }
       } else if (hasYahoo) {
         try {
           const d = await fetchYahooHistory(YAHOO_SYMBOL[assetId]);
@@ -107,7 +102,6 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
           return;
         } catch { /* fällt durch */ }
       }
-      // Kein echter Datensatz verfügbar
       if (!cancelled) { setData([]); setIsLive(false); }
     }
 
