@@ -11,10 +11,10 @@ import { NEWS_DEFAULT } from "./data/news";
 import { C, FONT, RADIUS } from "./styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP v9 — Echte Datenquellen für Silber + Makro
-// Gold/Silber: Frankfurter API (beide unterstützt)
-// Makro: Yahoo Finance via CORS-Proxy
-// Jede Zahl die nicht live ist wird klar als "Snapshot" markiert
+// APP v10 — ECHTES BACKEND
+// News + Trades kommen jetzt von /api/get-data (gefüllt durch Cron-Job 2x täglich)
+// Kein CORS-Problem mehr, kein manuelles Update mehr nötig
+// Preise weiterhin live im Browser (CoinGecko/Frankfurter/Yahoo — kein Auth nötig)
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchCryptoPrices() {
@@ -28,7 +28,6 @@ async function fetchCryptoPrices() {
   };
 }
 
-// ── METALLE — beide via Frankfurter API (unterstützt XAU UND XAG) ────────────
 async function fetchMetalPrices() {
   const result = { gold: null, silver: null };
   try {
@@ -41,21 +40,12 @@ async function fetchMetalPrices() {
     const d = await r.json();
     if (d?.rates?.USD) result.silver = { price: d.rates.USD, chg24: null, chg7: null, live: true };
   } catch {}
-  // Fallback falls API down
   if (!result.gold)   result.gold   = { price: 4036, chg24: +0.2, chg7: -5.1, live: false };
   if (!result.silver) result.silver = { price: 57.00, chg24: -0.3, chg7: -3.2, live: false };
   return result;
 }
 
-// ── MAKRO — Yahoo Finance via CORS-Proxy (allorigins) ─────────────────────────
-const YAHOO_SYMBOLS = {
-  spx:   "^GSPC",
-  ndx:   "^NDX",
-  wti:   "CL=F",
-  dxy:   "DX-Y.NYB",
-  us10y: "^TNX",
-  vix:   "^VIX",
-};
+const YAHOO_SYMBOLS = { spx:"^GSPC", ndx:"^NDX", wti:"CL=F", dxy:"DX-Y.NYB", us10y:"^TNX", vix:"^VIX" };
 
 async function fetchMacroPrices() {
   const out = {};
@@ -74,7 +64,7 @@ async function fetchMacroPrices() {
           const chg = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
           out[id] = { price, chg: parseFloat(chg.toFixed(2)), live: true };
         }
-      } catch { /* einzelner Symbol-Fehler ignoriert, Fallback greift */ }
+      } catch {}
     })
   );
   return out;
@@ -87,51 +77,24 @@ function fmtPrice(price,id) {
   return price.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
-async function fetchAINews() {
-  const res = await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-6",max_tokens:1500,
-      tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:`Suche die wichtigsten aktuellen Krypto und Finanz-News. NUR JSON ohne Backticks.
-JSON: {"news":[{"tag":"TAG","date":"heute","icon":"Emoji","title":"Titel","summary":"1-2 Sätze","full":"Analyse mit\\n\\n📌 Fachbegriffe:\\n• Begriff: Erklärung\\n\\n📈 Auswirkung:\\nText","impact":"bullisch oder bearisch oder neutral","impactCol":"#2ecc71 oder #e74c3c oder #f0b429"}]}`}],
-    }),
-  });
-  if (!res.ok) throw new Error(`${res.status}`);
-  const raw = await res.json();
-  const txt = raw.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
-  const m = txt.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("Kein JSON");
-  return JSON.parse(m[0]).news;
-}
-
-async function fetchAITrades(btcPrice, ethPrice, solPrice) {
-  const res = await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-6",max_tokens:2000,
-      tools:[{type:"web_search_20250305",name:"web_search"}],
-      messages:[{role:"user",content:`Analysiere den aktuellen Krypto-Markt und erstelle frische Trade-Setups.
-Aktuelle Preise: BTC $${btcPrice}, ETH $${ethPrice}, SOL $${solPrice}
-Suche im Web nach aktueller Marktlage BTC ETH SOL, wichtige Levels und Elliott Wave Analyse.
-Antworte NUR mit JSON, kein anderer Text, keine Backticks:
-{"timestamp":"HH:MM","trades":[{"asset":"Name","ticker":"X/USD","bias":"bull|neutral|bear","biasCol":"#2ecc71 oder #f0b429 oder #e74c3c","priority":"⭐ oder 💡 oder ⏸ oder ⛔ + Text","note":"Kurze Begründung","setups":[{"type":"long|short","label":"Timeframe: Setup-Beschreibung","tf":"1H · Scalp","wave":"Elliott-Kontext","entry":"Preis$","stop":"Preis$ (-X%)","t1":"Preis$ (+X%)","t2":"Preis$ (+X%)","crv":"1:X · 1:X","duration":"T1: Xh · T2: Xh","confluence":[["Signal","Wert ✅"]],"exec":"Ausführungshinweis","invalid":"Invalidierung","isBWave":false}]}]}`}],
-    }),
-  });
-  if (!res.ok) throw new Error(`Claude Trades ${res.status}`);
-  const raw = await res.json();
-  const txt = raw.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
-  const m = txt.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("Kein JSON");
-  const d = JSON.parse(m[0]);
-  if (!d.trades?.length) throw new Error("Keine Trades");
-  return d;
+// ── NEWS + TRADES VOM EIGENEN BACKEND HOLEN ──────────────────────────────────
+async function fetchBackendData() {
+  const res = await fetch("/api/get-data");
+  if (!res.ok) throw new Error(`Backend ${res.status}`);
+  return res.json();
 }
 
 function useIsMobile() {
   const [m,setM]=useState(window.innerWidth<768);
   useEffect(()=>{const h=()=>setM(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
   return m;
+}
+
+function formatTimestamp(iso) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString("de-AT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+  } catch { return null; }
 }
 
 function DashboardLogo() {
@@ -160,17 +123,16 @@ export default function App() {
   const [tab,setTab]=useState("markets");
   const [news,setNews]=useState(NEWS_DEFAULT);
   const [trades,setTrades]=useState(DEFAULT_TRADES);
-  const [tradeTimestamp,setTradeTimestamp]=useState(null);
+  const [newsUpdated,setNewsUpdated]=useState(null);
+  const [tradesUpdated,setTradesUpdated]=useState(null);
+  const [backendErr,setBackendErr]=useState(null);
   const [cryptoPrices,setCryptoPrices]=useState(null);
   const [metalPrices,setMetalPrices]=useState(null);
   const [macroPrices,setMacroPrices]=useState(null);
   const [lastFetch,setLastFetch]=useState(null);
   const [priceErr,setPriceErr]=useState(null);
-  const [newsLoading,setNewsLoading]=useState(false);
-  const [newsUpd,setNewsUpd]=useState(null);
-  const [tradeLoading,setTradeLoading]=useState(false);
-  const [tradeErr,setTradeErr]=useState(null);
 
+  // ── Preise: weiterhin live im Browser, alle 30s ──────────────────────────
   const loadPrices = useCallback(async () => {
     try {
       const [c,m,mk] = await Promise.allSettled([fetchCryptoPrices(),fetchMetalPrices(),fetchMacroPrices()]);
@@ -182,37 +144,26 @@ export default function App() {
     } catch(e) { setPriceErr(e.message); }
   },[]);
 
-  const loadNews = useCallback(async () => {
-    setNewsLoading(true);
+  // ── News + Trades: vom eigenen Backend, beim Laden + alle 10 Min prüfen ──
+  const loadBackendData = useCallback(async () => {
     try {
-      const n = await fetchAINews();
-      if (n?.length) setNews(n);
-      setNewsUpd(new Date().toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"}));
-    } catch {}
-    finally { setNewsLoading(false); }
+      const data = await fetchBackendData();
+      if (data.news?.length) { setNews(data.news); setNewsUpdated(data.newsUpdated); }
+      if (data.trades?.length) { setTrades(data.trades); setTradesUpdated(data.tradesUpdated); }
+      setBackendErr(null);
+    } catch(e) {
+      setBackendErr("Backend noch nicht eingerichtet — Standarddaten aktiv");
+    }
   },[]);
 
-  const updateTrades = useCallback(async () => {
-    if (tradeLoading) return;
-    setTradeLoading(true); setTradeErr(null);
-    try {
-      const btc = Math.round(cryptoPrices?.btc?.price||60000);
-      const eth = Math.round(cryptoPrices?.eth?.price||1500);
-      const sol = (cryptoPrices?.sol?.price||70).toFixed(2);
-      const result = await fetchAITrades(btc, eth, sol);
-      if (result.trades?.length) {
-        setTrades(result.trades);
-        setTradeTimestamp(result.timestamp || new Date().toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"}));
-      }
-    } catch(e) {
-      setTradeErr("Update fehlgeschlagen — statische Trades aktiv");
-    } finally { setTradeLoading(false); }
-  },[cryptoPrices,tradeLoading]);
-
   useEffect(()=>{ loadPrices(); const iv=setInterval(loadPrices,30000); return()=>clearInterval(iv); },[loadPrices]);
-  useEffect(()=>{ loadNews(); const iv=setInterval(loadNews,2*60*60*1000); return()=>clearInterval(iv); },[loadNews]);
+  useEffect(()=>{
+    loadBackendData();
+    // Alle 10 Minuten prüfen ob der Cron-Job neue Daten geliefert hat
+    const iv = setInterval(loadBackendData, 10*60*1000);
+    return()=>clearInterval(iv);
+  },[loadBackendData]);
 
-  // ── Assets mit Live-Daten + Live-Flag ─────────────────────────────────────
   const liveAssets = ASSETS.map(a => {
     const all = {...cryptoPrices, ...metalPrices};
     if (all[a.id]) {
@@ -228,11 +179,9 @@ export default function App() {
     return { ...a, isLive: false };
   });
 
-  // ── Makro mit echten Yahoo-Daten ──────────────────────────────────────────
   const liveMacro = MACRO_BASE.map(m => {
     const live = macroPrices?.[m.id];
     if (live) {
-      const isPercent = m.id === "us10y" || m.id === "vix";
       const decimals = ["wti","dxy","us10y","vix"].includes(m.id) ? 2 : 0;
       return {
         ...m,
@@ -255,9 +204,10 @@ export default function App() {
             <DashboardLogo/>
             <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
               {lastFetch && (
-                <div style={{fontSize:12,color:C.textLow,display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{color:C.bull}}>●</span> {lastFetch} · 30s
-                  {newsUpd&&<span style={{marginLeft:8}}>· 🤖 {newsUpd}</span>}
+                <div style={{fontSize:12,color:C.textLow,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <span style={{color:C.bull}}>●</span> Preise: {lastFetch}
+                  {newsUpdated && <span>· News: {formatTimestamp(newsUpdated)}</span>}
+                  {tradesUpdated && <span>· Trades: {formatTimestamp(tradesUpdated)}</span>}
                 </div>
               )}
               <a href={TOTAL_MARKET_CAP_LINK} target="_blank" rel="noopener noreferrer"
@@ -268,15 +218,10 @@ export default function App() {
                 style={{display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.purple}55`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.purple,fontSize:12,fontWeight:700,textDecoration:"none"}}>
                 🔗 {isMobile?"MCO":"MCO Terminal"}
               </a>
-              <button onClick={loadNews} disabled={newsLoading}
-                style={{background:C.surface,border:`1px solid ${C.gold}`,borderRadius:RADIUS.md,padding:"9px 14px",color:newsLoading?C.textLow:C.gold,fontSize:12,fontWeight:700,cursor:newsLoading?"wait":"pointer",display:"flex",alignItems:"center",gap:6}}>
-                <span style={{animation:newsLoading?"spin 0.8s linear infinite":"none",display:"inline-block"}}>{newsLoading?"⟳":"🤖"}</span>
-                {isMobile?"":"News"}
-              </button>
             </div>
           </div>
           {priceErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#160606",border:`1px solid ${C.bear}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.bear}}>⚠️ {priceErr}</div>}
-          <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+          {backendErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#1a1500",border:`1px solid ${C.gold}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.gold}}>ℹ️ {backendErr}</div>}
         </header>
 
         <NewsTicker isMobile={isMobile}/>
@@ -308,11 +253,7 @@ export default function App() {
                 {liveAssets.filter(a=>["gold","silver"].includes(a.id)).map(a=>(
                   <div key={a.id} style={{position:"relative"}}>
                     <AssetCard a={a}/>
-                    {!a.isLive && (
-                      <div style={{position:"absolute",top:14,right:14,fontSize:10,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 8px"}}>
-                        SNAPSHOT
-                      </div>
-                    )}
+                    {!a.isLive && <div style={{position:"absolute",top:14,right:14,fontSize:10,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 8px"}}>SNAPSHOT</div>}
                   </div>
                 ))}
               </div>
@@ -321,11 +262,7 @@ export default function App() {
                 {liveMacro.map(m=>(
                   <div key={m.n} style={{position:"relative"}}>
                     <MacroTile m={m}/>
-                    {!m.isLive && (
-                      <div style={{position:"absolute",top:10,right:10,fontSize:9,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 6px"}}>
-                        SNAPSHOT
-                      </div>
-                    )}
+                    {!m.isLive && <div style={{position:"absolute",top:10,right:10,fontSize:9,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 6px"}}>SNAPSHOT</div>}
                   </div>
                 ))}
               </div>
@@ -336,29 +273,13 @@ export default function App() {
         {/* TRADES */}
         {tab==="trades"&&(
           <div>
-            <div style={{background:C.surface,border:`1px solid ${C.gold}44`,borderRadius:RADIUS.md,padding:"18px 22px",marginBottom:22}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:14}}>
-                <div>
-                  <div style={{fontSize:16,color:C.textHi,fontWeight:700,marginBottom:6}}>
-                    〰️ Elliott-Wave Trade-Setups
-                    {tradeTimestamp&&<span style={{fontSize:13,color:C.bull,fontWeight:400,marginLeft:12}}>✓ Update: {tradeTimestamp}</span>}
-                  </div>
-                  <div style={{fontSize:13,color:C.textMid}}>
-                    Klick auf <strong style={{color:C.gold}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
-                    {tradeLoading&&<span style={{color:C.gold,marginLeft:8}}>〰️ Claude analysiert...</span>}
-                    {tradeErr&&<span style={{color:C.bear,marginLeft:8}}>⚠️ {tradeErr}</span>}
-                  </div>
-                </div>
-                <button onClick={updateTrades} disabled={tradeLoading} style={{
-                  background:tradeLoading?"#1a1a00":C.gold,color:tradeLoading?C.textLow:C.bg,
-                  border:"none",borderRadius:RADIUS.md,padding:"12px 22px",fontSize:14,fontWeight:800,
-                  cursor:tradeLoading?"wait":"pointer",display:"flex",alignItems:"center",gap:8,
-                  flexShrink:0,transition:"all 0.15s",letterSpacing:"0.02em",
-                  boxShadow:tradeLoading?"none":`0 4px 16px rgba(240,180,41,0.3)`,
-                }}>
-                  <span style={{fontSize:16,display:"inline-block",animation:tradeLoading?"spin 0.8s linear infinite":"none"}}>{tradeLoading?"⟳":"🤖"}</span>
-                  {tradeLoading?"Analysiere...":"Trades jetzt updaten"}
-                </button>
+            <div style={{background:C.surface,border:`1px solid ${C.gold}44`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:22}}>
+              <div style={{fontSize:15,color:C.textHi,fontWeight:600,marginBottom:6}}>
+                〰️ Elliott-Wave Trade-Setups
+                {tradesUpdated && <span style={{fontSize:13,color:C.bull,fontWeight:400,marginLeft:12}}>✓ Automatisch aktualisiert: {formatTimestamp(tradesUpdated)}</span>}
+              </div>
+              <div style={{fontSize:13,color:C.textMid}}>
+                Aktualisiert sich automatisch 2x täglich im Hintergrund (06:00 + 18:00 UTC). Klick auf <strong style={{color:C.gold}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:18}}>
@@ -371,12 +292,9 @@ export default function App() {
         {tab==="news"&&(
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
-              <div style={{fontSize:14,color:C.textLow}}>Klick → vollständige Analyse + Fachbegriff-Erklärungen · Auto alle 2h</div>
-              <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                {newsUpd&&<span style={{fontSize:12,color:C.bull}}>🤖 {newsUpd}</span>}
-                <button onClick={loadNews} disabled={newsLoading} style={{background:C.surface,border:`1px solid ${C.gold}44`,borderRadius:RADIUS.sm,padding:"8px 16px",color:C.gold,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                  {newsLoading?"⟳ Lädt...":"🔄 Jetzt updaten"}
-                </button>
+              <div style={{fontSize:14,color:C.textLow}}>
+                Klick → vollständige Analyse + Fachbegriff-Erklärungen
+                {newsUpdated && <span style={{color:C.bull,marginLeft:8}}>· ✓ Aktualisiert: {formatTimestamp(newsUpdated)}</span>}
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,alignItems:"start"}}>
@@ -394,7 +312,7 @@ export default function App() {
         )}
 
         <div style={{marginTop:40,fontSize:12,color:C.textLow,textAlign:"center",lineHeight:2}}>
-          CoinGecko · Frankfurter API · Yahoo Finance · Claude AI News · "SNAPSHOT" = keine Live-Quelle verfügbar · keine Anlageberatung
+          CoinGecko · Frankfurter API · Yahoo Finance · Claude AI (automatisch 2x täglich) · keine Anlageberatung
         </div>
       </div>
     </div>
