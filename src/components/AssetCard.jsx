@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import Modal from "./Modal";
 import UnifiedChart from "./UnifiedChart";
+import { useLivePrice } from "../hooks/useLivePrice";
 import { C, FONT, RADIUS, BIAS_COL, DIR_ICON } from "../styles/theme";
 import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ASSET CARD v9 — Elliott-Wellen-Analyse jetzt AUCH im 7-Tage (kurzfristig) Tab
-// Vorher nur im Weekly-Tab. Jetzt: kurzfristige Welle (a.wave/a.waveDetail)
-// wird zusätzlich unter dem 7-Tage-Chart angezeigt.
+// ASSET CARD v10
+// Preis-Anzeige (Header der Karte) und Chart teilen jetzt denselben
+// Live-Preis-State (useLivePrice via Binance WebSocket, Sekundentakt) —
+// garantiert synchron für BTC/ETH/SOL. Gold/Silber bleiben bei ihrem
+// 30s-REST-Update, da Yahoo keinen kostenlosen WebSocket anbietet.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function WeeklyChart({ data, levels=[], unit="$", h=380 }) {
@@ -20,7 +23,6 @@ function WeeklyChart({ data, levels=[], unit="$", h=380 }) {
   const isUp = end.p >= start.p;
   const pct = ((end.p-start.p)/start.p*100).toFixed(1);
   const trendCol = isUp ? C.bull : C.bear;
-
   return (
     <div style={{position:"relative"}}>
       <div style={{position:"absolute",top:6,left:8,zIndex:1,display:"flex",alignItems:"center",gap:10}}>
@@ -33,23 +35,16 @@ function WeeklyChart({ data, levels=[], unit="$", h=380 }) {
           <YAxis domain={[yMin,yMax]} tick={{fill:C.textMid,fontSize:11,fontFamily:FONT.mono}} width={72}
             tickFormatter={v=>`${unit}${v>=1000?Math.round(v).toLocaleString("de-DE"):v.toFixed(2)}`}
             axisLine={{stroke:C.borderHi}} tickLine={{stroke:C.border}}/>
-          <XAxis dataKey="t" tick={{fill:C.textMid,fontSize:10}} axisLine={{stroke:C.borderHi}} tickLine={{stroke:C.border}}
-            interval={Math.floor(data.length/6)} height={28}/>
-          <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:6,fontSize:12,color:C.textHi}}
-            formatter={v=>[`${unit}${v.toLocaleString("de-DE")}`,""]} labelStyle={{color:C.textMid}}/>
-          {levels.map((lv,i)=>(
-            <ReferenceLine key={i} y={lv.v} stroke={lv.col} strokeDasharray="5 3" strokeWidth={1.5}
-              label={{value:lv.lbl,position:"insideTopRight",fill:lv.col,fontSize:11,fontWeight:700}}/>
-          ))}
-          <Line type="monotone" dataKey="p" stroke={trendCol} strokeWidth={2.5} dot={false} isAnimationActive={false}
-            activeDot={{r:6,fill:trendCol,stroke:C.bg,strokeWidth:2}}/>
+          <XAxis dataKey="t" tick={{fill:C.textMid,fontSize:10}} axisLine={{stroke:C.borderHi}} tickLine={{stroke:C.border}} interval={Math.floor(data.length/6)} height={28}/>
+          <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:6,fontSize:12,color:C.textHi}} formatter={v=>[`${unit}${v.toLocaleString("de-DE")}`,""]} labelStyle={{color:C.textMid}}/>
+          {levels.map((lv,i)=>(<ReferenceLine key={i} y={lv.v} stroke={lv.col} strokeDasharray="5 3" strokeWidth={1.5} label={{value:lv.lbl,position:"insideTopRight",fill:lv.col,fontSize:11,fontWeight:700}}/>))}
+          <Line type="monotone" dataKey="p" stroke={trendCol} strokeWidth={2.5} dot={false} isAnimationActive={false} activeDot={{r:6,fill:trendCol,stroke:C.bg,strokeWidth:2}}/>
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-// ── ELLIOTT-WELLEN-BOX — wiederverwendbar für kurz- UND langfristig ─────────
 function WaveBox({ currentWave, waveStructure, nextWaves, waveDetail, title="Elliott-Wellen-Position" }) {
   return (
     <div style={{background:C.surface,border:`1px solid ${C.gold}33`,borderRadius:RADIUS.lg,padding:"18px 22px",marginBottom:18}}>
@@ -73,9 +68,17 @@ function WaveBox({ currentWave, waveStructure, nextWaves, waveDetail, title="Ell
   );
 }
 
-function FocusModal({ asset: a, onClose }) {
+function fmtLivePrice(price, id) {
+  if (price === null || price === undefined) return null;
+  if (id === "btc") return Math.round(price).toLocaleString("de-DE");
+  if (id === "eth") return Math.round(price).toLocaleString("de-DE");
+  return price.toLocaleString("de-DE", { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function FocusModal({ asset: a, livePrice, onClose }) {
   const [view, setView] = useState("short");
   const bc = BIAS_COL[a.bias] || C.gold;
+  const displayPrice = fmtLivePrice(livePrice, a.id) || a.price;
   const dirReason = a.chg24>0
     ? {icon:"📈",color:C.bull,label:"Aktuell steigend — Warum?"}
     : a.chg24<0
@@ -85,7 +88,6 @@ function FocusModal({ asset: a, onClose }) {
   return (
     <Modal onClose={onClose} maxWidth={1020} accentColor={bc}>
       <div style={{padding:"28px 36px 28px"}}>
-        {/* Header */}
         <div style={{display:"flex",alignItems:"flex-start",gap:16,marginBottom:22}}>
           <span style={{fontSize:46,lineHeight:1}}>{a.emoji}</span>
           <div style={{flex:1}}>
@@ -97,23 +99,17 @@ function FocusModal({ asset: a, onClose }) {
               </span>
             </div>
             <div style={{display:"flex",alignItems:"baseline",gap:14,marginTop:8}}>
-              <span style={{fontSize:40,fontWeight:700,color:C.textHi,fontVariantNumeric:"tabular-nums",fontFamily:FONT.mono}}>{a.unit}{a.price}</span>
+              <span style={{fontSize:40,fontWeight:700,color:C.textHi,fontVariantNumeric:"tabular-nums",fontFamily:FONT.mono}}>{a.unit}{displayPrice}</span>
               <span style={{fontSize:17,fontWeight:700,color:a.chg24>=0?C.bull:C.bear}}>{a.chg24>=0?"+":""}{a.chg24}% 24h</span>
               <span style={{fontSize:14,fontWeight:600,color:a.chg7>=0?C.bull:C.bear}}>{a.chg7>=0?"+":""}{a.chg7}% 7D</span>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
         <div style={{display:"flex",gap:6,marginBottom:14}}>
-          {[
-            ["short","📊 Kurzfristig (7 Tage)"],
-            ["long","📈 Langfristig (6 Monate Weekly)"],
-            ["tv","🔗 TradingView Charts"],
-          ].map(([v,l])=>(
+          {[["short","📊 Kurzfristig (7 Tage)"],["long","📈 Langfristig (6 Monate Weekly)"],["tv","🔗 TradingView Charts"]].map(([v,l])=>(
             <button key={v} onClick={()=>setView(v)} style={{
-              flex:1,padding:"10px 0",
-              background:view===v?C.surface:"transparent",
+              flex:1,padding:"10px 0", background:view===v?C.surface:"transparent",
               border:view===v?`1px solid ${C.gold}55`:`1px solid ${C.border}`,
               borderRadius:RADIUS.sm,color:view===v?C.gold:C.textMid,
               fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s",
@@ -121,40 +117,24 @@ function FocusModal({ asset: a, onClose }) {
           ))}
         </div>
 
-        {/* KURZFRISTIG — 7 Tage + Wellen-Analyse JETZT MIT DABEI */}
         {view==="short" && (
           <div>
             <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"8px 4px",background:C.surface,marginBottom:16}}>
-              <UnifiedChart assetId={a.id} unit={a.unit} h={360} levels={a.levels||[]} currentPrice={a.price}/>
+              <UnifiedChart assetId={a.id} unit={a.unit} h={360} levels={a.levels||[]} livePrice={livePrice}/>
             </div>
-            {/* NEU: Elliott-Wellen-Box auch im kurzfristigen Tab */}
-            <WaveBox
-              title="Kurzfristige Elliott-Wellen-Position (1H/4H)"
-              currentWave={a.currentWave}
-              waveStructure={a.wave?.split("—")[0]?.trim()}
-              nextWaves={a.nextWaves}
-              waveDetail={a.waveDetail}
-            />
+            <WaveBox title="Kurzfristige Elliott-Wellen-Position (1H/4H)" currentWave={a.currentWave} waveStructure={a.wave?.split("—")[0]?.trim()} nextWaves={a.nextWaves} waveDetail={a.waveDetail}/>
           </div>
         )}
 
-        {/* LANGFRISTIG — 6 Monate Weekly */}
         {view==="long" && (
           <div>
             <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"8px 4px",background:C.surface,marginBottom:16}}>
               <WeeklyChart data={a.pathWeekly} levels={a.levelsWeekly||[]} unit={a.unit} h={380}/>
             </div>
-            <WaveBox
-              title="Übergeordnete Elliott-Struktur (Weekly)"
-              currentWave={a.currentWave}
-              waveStructure={a.waveStructure}
-              nextWaves={a.nextWaves}
-              waveDetail={a.waveWeekly||a.waveDetail}
-            />
+            <WaveBox title="Übergeordnete Elliott-Struktur (Weekly)" currentWave={a.currentWave} waveStructure={a.waveStructure} nextWaves={a.nextWaves} waveDetail={a.waveWeekly||a.waveDetail}/>
           </div>
         )}
 
-        {/* TV-LINKS */}
         {view==="tv" && (
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
             <div style={{background:C.surface,borderRadius:RADIUS.lg,border:`1px solid ${C.blue}44`,padding:"28px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center"}}>
@@ -162,11 +142,7 @@ function FocusModal({ asset: a, onClose }) {
               <div>
                 <div style={{fontSize:15,fontWeight:700,color:C.textHi,marginBottom:6}}>Kurzfristiger Chart</div>
                 <div style={{fontSize:13,color:C.textMid,marginBottom:16}}>1H / 4H mit Wellenzählung<br/>und kurzfristigen Levels</div>
-                <a href={a.tvLink} target="_blank" rel="noopener noreferrer" style={{
-                  display:"inline-flex",alignItems:"center",gap:8,
-                  background:C.blue,color:"#fff",textDecoration:"none",
-                  padding:"12px 24px",borderRadius:RADIUS.md,fontSize:14,fontWeight:700,
-                }}>📊 Öffnen →</a>
+                <a href={a.tvLink} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,background:C.blue,color:"#fff",textDecoration:"none",padding:"12px 24px",borderRadius:RADIUS.md,fontSize:14,fontWeight:700}}>📊 Öffnen →</a>
               </div>
             </div>
             <div style={{background:C.surface,borderRadius:RADIUS.lg,border:`1px solid ${C.gold}44`,padding:"28px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:14,textAlign:"center"}}>
@@ -174,17 +150,12 @@ function FocusModal({ asset: a, onClose }) {
               <div>
                 <div style={{fontSize:15,fontWeight:700,color:C.textHi,marginBottom:6}}>Langfristiger Chart</div>
                 <div style={{fontSize:13,color:C.textMid,marginBottom:16}}>Weekly / Daily mit<br/>übergeordneter Struktur</div>
-                <a href={a.tvLinkLong||a.tvLink} target="_blank" rel="noopener noreferrer" style={{
-                  display:"inline-flex",alignItems:"center",gap:8,
-                  background:C.gold,color:C.bg,textDecoration:"none",
-                  padding:"12px 24px",borderRadius:RADIUS.md,fontSize:14,fontWeight:700,
-                }}>📊 Öffnen →</a>
+                <a href={a.tvLinkLong||a.tvLink} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,background:C.gold,color:C.bg,textDecoration:"none",padding:"12px 24px",borderRadius:RADIUS.md,fontSize:14,fontWeight:700}}>📊 Öffnen →</a>
               </div>
             </div>
           </div>
         )}
 
-        {/* Warum steigt/fällt — außer bei TV */}
         {view!=="tv" && (
           <div style={{background:C.surface,border:`1px solid ${dirReason.color}33`,borderRadius:RADIUS.lg,padding:"18px 22px",marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
@@ -205,7 +176,6 @@ function FocusModal({ asset: a, onClose }) {
           </div>
         )}
 
-        {/* Key Stats */}
         {a.keyStats && (
           <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8}}>
             {a.keyStats.map(([k,v],i)=>(
@@ -225,13 +195,13 @@ export default function AssetCard({ a }) {
   const [focused, setFocused] = useState(false);
   const bc = BIAS_COL[a.bias] || C.gold;
 
+  // Zentraler Live-Preis-Hook — wird für Header UND Chart genutzt
+  const { price: livePrice, connected } = useLivePrice(a.id);
+  const displayPrice = fmtLivePrice(livePrice, a.id) || a.price;
+
   return (
     <>
-      <div style={{
-        background:C.card,border:`1px solid ${C.border}`,
-        borderRadius:RADIUS.lg,padding:"20px 22px 16px",
-        transition:"border-color 0.15s",
-      }}
+      <div style={{ background:C.card,border:`1px solid ${C.border}`, borderRadius:RADIUS.lg,padding:"20px 22px 16px", transition:"border-color 0.15s" }}
         onMouseEnter={e=>e.currentTarget.style.borderColor=bc}
         onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}
       >
@@ -244,27 +214,27 @@ export default function AssetCard({ a }) {
               <span style={{fontSize:12,fontWeight:700,color:bc,border:`1px solid ${bc}44`,borderRadius:4,padding:"2px 9px"}}>
                 {DIR_ICON[a.bias]} {a.bias==="bull"?"BULL":a.bias==="bear"?"BEAR":"NEUTRAL"}
               </span>
+              {connected && (
+                <span style={{ width:6, height:6, borderRadius:"50%", background:C.bull, display:"inline-block", animation:"pulse 1.5s infinite" }} title="Live via WebSocket"/>
+              )}
             </div>
             <div style={{display:"flex",alignItems:"baseline",gap:12}}>
-              <span style={{fontSize:30,fontWeight:700,color:C.textHi,fontVariantNumeric:"tabular-nums",fontFamily:FONT.mono}}>{a.unit}{a.price}</span>
+              <span style={{fontSize:30,fontWeight:700,color:C.textHi,fontVariantNumeric:"tabular-nums",fontFamily:FONT.mono}}>{a.unit}{displayPrice}</span>
               <span style={{fontSize:16,fontWeight:700,color:a.chg24>=0?C.bull:C.bear}}>{a.chg24>=0?"+":""}{a.chg24}% 24h</span>
               <span style={{fontSize:14,fontWeight:600,color:a.chg7>=0?C.bull:C.bear}}>{a.chg7>=0?"+":""}{a.chg7}% 7D</span>
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
             <button onClick={()=>setFocused(true)} style={{
-              background:C.surface,border:`1px solid ${C.border}`,
-              borderRadius:RADIUS.sm,padding:"8px 16px",
+              background:C.surface,border:`1px solid ${C.border}`, borderRadius:RADIUS.sm,padding:"8px 16px",
               color:C.textMid,fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s",
             }}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=bc;e.currentTarget.style.color=bc;}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.textMid;}}
             >⊕ Detail & Analyse</button>
             <a href={a.tvLinkLong||a.tvLink} target="_blank" rel="noopener noreferrer" style={{
-              display:"inline-flex",alignItems:"center",gap:5,
-              background:"transparent",border:`1px solid ${C.gold}44`,
-              borderRadius:RADIUS.sm,padding:"6px 12px",
-              color:C.gold,fontSize:11,fontWeight:600,textDecoration:"none",transition:"all 0.15s",
+              display:"inline-flex",alignItems:"center",gap:5, background:"transparent",border:`1px solid ${C.gold}44`,
+              borderRadius:RADIUS.sm,padding:"6px 12px", color:C.gold,fontSize:11,fontWeight:600,textDecoration:"none",transition:"all 0.15s",
             }}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=C.gold;e.currentTarget.style.background="#1a1200";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=`${C.gold}44`;e.currentTarget.style.background="transparent";}}
@@ -273,7 +243,7 @@ export default function AssetCard({ a }) {
         </div>
 
         <div style={{border:`1px solid ${C.border}`,borderRadius:RADIUS.md,overflow:"hidden",padding:"6px 2px",background:C.surface}}>
-          <UnifiedChart assetId={a.id} unit={a.unit} h={220} levels={a.levels||[]} currentPrice={a.price}/>
+          <UnifiedChart assetId={a.id} unit={a.unit} h={220} levels={a.levels||[]} livePrice={livePrice}/>
         </div>
 
         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
@@ -285,9 +255,10 @@ export default function AssetCard({ a }) {
             </div>
           )}
         </div>
+        <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
       </div>
 
-      {focused && <FocusModal asset={a} onClose={()=>setFocused(false)}/>}
+      {focused && <FocusModal asset={a} livePrice={livePrice} onClose={()=>setFocused(false)}/>}
     </>
   );
 }
