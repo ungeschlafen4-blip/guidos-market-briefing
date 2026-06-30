@@ -3,16 +3,20 @@ import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianG
 import { C, FONT, RADIUS } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UNIFIED CHART v5
-// Historie weiterhin via Binance (Krypto) / eigener Yahoo-Proxy (Gold/Silber/Makro)
-// NEU: optional wird der allerletzte Punkt sanft an livePrice angeglichen,
-// damit Chart-Ende und Live-Preis-Anzeige in der Karte synchron wirken —
-// aber nur als kleine Korrektur am letzten Punkt, nicht als harter Sprung,
-// damit die Kurvenform (dein Hauptanliegen vorhin) erhalten bleibt.
+// UNIFIED CHART v6 — Robustere Fehlerbehandlung + Retry
+// Problem zuvor: Binance REST-Klines-Endpoint kann gelegentlich durch
+// Rate-Limiting oder Netzwerk-Hänger fehlschlagen, auch wenn der WebSocket
+// (für den Live-Preis) parallel weiterläuft — das sind zwei komplett
+// unabhängige Verbindungen. Lösung: automatischer Retry + klar sichtbarer
+// Status, und ein Fallback auf unseren eigenen Yahoo-Proxy auch für Krypto
+// falls Binance direkt mal nicht erreichbar ist.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BINANCE_SYMBOL = { btc: "BTCUSDT", eth: "ETHUSDT", sol: "SOLUSDT" };
-const YAHOO_SYMBOL = { gold:"GC=F", silver:"SI=F", spx:"^GSPC", ndx:"^NDX", wti:"CL=F", dxy:"DX-Y.NYB", us10y:"^TNX", vix:"^VIX" };
+const YAHOO_SYMBOL = {
+  btc: "BTC-USD", eth: "ETH-USD", sol: "SOL-USD",
+  gold:"GC=F", silver:"SI=F", spx:"^GSPC", ndx:"^NDX", wti:"CL=F", dxy:"DX-Y.NYB", us10y:"^TNX", vix:"^VIX",
+};
 
 const DAY_LABELS = ["So","Mo","Di","Mi","Do","Fr","Sa"];
 function formatDayLabel(date) { return DAY_LABELS[date.getDay()]; }
@@ -21,6 +25,7 @@ async function fetchBinanceHistory(symbol) {
   const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=3h&limit=56`);
   if (!res.ok) throw new Error(`Binance ${res.status}`);
   const raw = await res.json();
+  if (!Array.isArray(raw) || !raw.length) throw new Error("Leere Binance-Antwort");
   let lastDate = null;
   return raw.map(k => {
     const date = new Date(k[0]);
@@ -52,6 +57,19 @@ async function fetchYahooHistory(symbol) {
   return points;
 }
 
+// Ein Versuch mit einmaligem Retry nach kurzer Pause
+async function fetchWithRetry(fn, retries = 1, delayMs = 800) {
+  try {
+    return await fn();
+  } catch (e) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, delayMs));
+      return fetchWithRetry(fn, retries - 1, delayMs);
+    }
+    throw e;
+  }
+}
+
 function ChartTooltip({ active, payload, label, unit, decimals }) {
   if (!active || !payload?.length) return null;
   const val = payload[0]?.value;
@@ -67,13 +85,10 @@ function ChartTooltip({ active, payload, label, unit, decimals }) {
   );
 }
 
-// livePrice: optionaler aktueller Preis (vom WebSocket-Hook), um den letzten
-// Punkt sanft zu synchronisieren — fließt NICHT in die Kurvenform der Vergangenheit ein
 export default function UnifiedChart({ assetId, unit="$", h=240, levels=[], livePrice=null }) {
   const [data, setData] = useState(null);
   const [isLive, setIsLive] = useState(false);
   const isCrypto = !!BINANCE_SYMBOL[assetId];
-  const hasYahoo = !!YAHOO_SYMBOL[assetId];
 
   useEffect(() => {
     let cancelled = false;
@@ -81,24 +96,28 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[], live
     setIsLive(false);
 
     async function load() {
+      // 1. Versuch: Binance direkt (für Krypto) — mit 1 automatischem Retry
       if (isCrypto) {
         try {
-          const d = await fetchBinanceHistory(BINANCE_SYMBOL[assetId]);
+          const d = await fetchWithRetry(() => fetchBinanceHistory(BINANCE_SYMBOL[assetId]), 1);
           if (!cancelled) { setData(d); setIsLive(true); }
           return;
-        } catch {}
-      } else if (hasYahoo) {
+        } catch { /* weiter zu Yahoo-Fallback */ }
+      }
+      // 2. Versuch: unser eigener Yahoo-Proxy (funktioniert für Krypto UND Gold/Silber/Makro)
+      const ySymbol = YAHOO_SYMBOL[assetId];
+      if (ySymbol) {
         try {
-          const d = await fetchYahooHistory(YAHOO_SYMBOL[assetId]);
+          const d = await fetchWithRetry(() => fetchYahooHistory(ySymbol), 1);
           if (!cancelled) { setData(d); setIsLive(true); }
           return;
-        } catch {}
+        } catch { /* beide Quellen fehlgeschlagen */ }
       }
       if (!cancelled) { setData([]); setIsLive(false); }
     }
     load();
     return () => { cancelled = true; };
-  }, [assetId, isCrypto, hasYahoo]);
+  }, [assetId, isCrypto]);
 
   if (data === null) {
     return (
@@ -111,12 +130,11 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[], live
   if (!data.length) {
     return (
       <div style={{ height:h, display:"flex", alignItems:"center", justifyContent:"center", color:C.textLow, fontSize:13, textAlign:"center", padding:"0 20px" }}>
-        Chart-Daten aktuell nicht verfügbar (Quelle nicht erreichbar)
+        Chart-Daten aktuell nicht verfügbar — beide Quellen nicht erreichbar
       </div>
     );
   }
 
-  // Sanfte Synchronisation: nur den letzten Punkt auf livePrice setzen, Rest unangetastet
   let displayData = data;
   if (isCrypto && livePrice) {
     displayData = [...data.slice(0, -1), { ...data[data.length-1], p: livePrice }];
