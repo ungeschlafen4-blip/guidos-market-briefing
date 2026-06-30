@@ -1,16 +1,38 @@
 import React, { useEffect, useState } from "react";
+import { useLivePrice } from "../hooks/useLivePrice";
 import { C, FONT, RADIUS } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NEWS TICKER v2 — Echte Live-Preise statt fester Texte
-// Nimmt liveAssets als Prop entgegen (von App.jsx übergeben)
+// NEWS TICKER v3 — nutzt denselben WebSocket-Live-Preis wie die Asset-Karten
+// statt der separaten 30s-REST-Preise. Damit ist der Ticker garantiert
+// im selben Sekundentakt synchron mit dem, was unten in den Karten steht.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Statische Alert-Items bleiben (Termine, Kalender-Hinweise) — die ändern sich nicht stündlich
 const STATIC_ALERTS = [
   { type:"alert", color:C.bear, text:"📅 CPI Juni am 14. Juli — wichtigster Makro-Event" },
   { type:"alert", color:C.textMid, text:"📅 FOMC 28.–29. Juli — möglicher erster Hike" },
 ];
+
+function fmtTickerPrice(price, id) {
+  if (price === null || price === undefined) return null;
+  if (id === "btc" || id === "eth") return Math.round(price).toLocaleString("de-DE");
+  return price.toLocaleString("de-DE", { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+// Einzelne Live-Preis-Komponenten für BTC/ETH/SOL — jede hängt am selben
+// WebSocket-Hook wie die jeweilige Asset-Karte
+function LiveTickerPrice({ assetId, emoji, name, unit, fallbackPrice, fallbackChg }) {
+  const { price } = useLivePrice(assetId);
+  const displayPrice = fmtTickerPrice(price, assetId) || fallbackPrice;
+  // Trend grob aus 24h-Veränderung (vom Snapshot) ableiten, da der reine
+  // Trade-Preis keine Richtung direkt mitliefert
+  const color = (fallbackChg ?? 0) >= 0 ? C.bull : C.bear;
+  return (
+    <span style={{ fontSize:13, fontWeight:700, color, padding:"0 20px", fontFamily:FONT.mono }}>
+      {emoji} {name}  {unit}{displayPrice}  {(fallbackChg ?? 0) >= 0 ? "+" : ""}{fallbackChg}%
+    </span>
+  );
+}
 
 export default function NewsTicker({ isMobile, liveAssets = [] }) {
   const [paused, setPaused] = useState(false);
@@ -21,15 +43,8 @@ export default function NewsTicker({ isMobile, liveAssets = [] }) {
     return () => clearInterval(t);
   }, []);
 
-  // Live-Preis-Items aus den übergebenen Assets bauen
-  const priceItems = liveAssets.map(a => ({
-    type: "price",
-    color: a.chg24 >= 0 ? C.bull : C.bear,
-    text: `${a.emoji} ${a.name.toUpperCase()}  ${a.unit}${a.price}  ${a.chg24 >= 0 ? "+" : ""}${a.chg24}%`,
-  }));
-
-  const allItems = [...priceItems, ...STATIC_ALERTS];
-  const fullItems = allItems.length ? [...allItems, ...allItems] : [];
+  const cryptoAssets = liveAssets.filter(a => ["btc","eth","sol"].includes(a.id));
+  const otherAssets  = liveAssets.filter(a => !["btc","eth","sol"].includes(a.id));
 
   return (
     <div style={{
@@ -45,20 +60,34 @@ export default function NewsTicker({ isMobile, liveAssets = [] }) {
 
       <div style={{ overflow:"hidden", flex:1, position:"relative", cursor:"pointer" }}
         onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} title="Hover zum Anhalten">
-        {fullItems.length === 0 ? (
+        {liveAssets.length === 0 ? (
           <div style={{ padding:"0 20px", fontSize:13, color:C.textLow }}>Lade Live-Preise...</div>
         ) : (
           <div style={{ display:"flex", alignItems:"center", animation: paused ? "none" : "ticker 60s linear infinite", whiteSpace:"nowrap" }}>
-            {fullItems.map((item, i) => (
-              <span key={i} style={{ display:"inline-flex", alignItems:"center" }}>
-                <span style={{
-                  fontSize:13, fontWeight: item.type==="alert" ? 700 : 700,
-                  color: item.type==="alert" && blinkOn ? item.color : item.type==="alert" ? `${item.color}88` : item.color,
-                  padding:"0 20px", fontFamily: item.type==="price" ? FONT.mono : FONT.sans,
-                  transition:"color 0.3s",
-                }}>{item.text}</span>
-                <span style={{ color:C.textLow, fontSize:16, opacity:0.3 }}>·</span>
-              </span>
+            {/* Zweimal hintereinander für nahtlose Schleife */}
+            {[0, 1].map(loop => (
+              <React.Fragment key={loop}>
+                {cryptoAssets.map(a => (
+                  <span key={`${loop}-${a.id}`} style={{ display:"inline-flex", alignItems:"center" }}>
+                    <LiveTickerPrice assetId={a.id} emoji={a.emoji} name={a.name.toUpperCase()} unit={a.unit} fallbackPrice={a.price} fallbackChg={a.chg24}/>
+                    <span style={{ color:C.textLow, fontSize:16, opacity:0.3 }}>·</span>
+                  </span>
+                ))}
+                {otherAssets.map(a => (
+                  <span key={`${loop}-${a.id}`} style={{ display:"inline-flex", alignItems:"center" }}>
+                    <span style={{ fontSize:13, fontWeight:700, color: a.chg24>=0?C.bull:C.bear, padding:"0 20px", fontFamily:FONT.mono }}>
+                      {a.emoji} {a.name.toUpperCase()}  {a.unit}{a.price}  {a.chg24>=0?"+":""}{a.chg24}%
+                    </span>
+                    <span style={{ color:C.textLow, fontSize:16, opacity:0.3 }}>·</span>
+                  </span>
+                ))}
+                {STATIC_ALERTS.map((item,i) => (
+                  <span key={`${loop}-alert-${i}`} style={{ display:"inline-flex", alignItems:"center" }}>
+                    <span style={{ fontSize:13, fontWeight:700, color: blinkOn ? item.color : `${item.color}88`, padding:"0 20px", transition:"color 0.3s" }}>{item.text}</span>
+                    <span style={{ color:C.textLow, fontSize:16, opacity:0.3 }}>·</span>
+                  </span>
+                ))}
+              </React.Fragment>
             ))}
           </div>
         )}
