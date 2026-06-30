@@ -13,7 +13,8 @@ import { NEWS_DEFAULT } from "./data/news";
 import { C, FONT, RADIUS } from "./styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP v12 — Splash-Screen beim Start + neuer Ticker mit Live-Sync
+// APP v13 — Trades-Layout gefixt: column-basiert statt grid,
+// damit unterschiedlich hohe Karten keine grauen Lücken mehr erzeugen
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchCryptoPrices() {
@@ -92,12 +93,18 @@ function formatTimestamp(iso) {
   catch { return null; }
 }
 
-export default function App() {
-  const [showSplash, setShowSplash] = useState(() => {
-    // Nur beim echten Laden/Refresh zeigen, nicht bei jedem internen State-Update
-    return true;
-  });
+// ── Hilfsfunktion: Liste in zwei möglichst ausbalancierte Spalten aufteilen ───
+// Verhindert, dass eine Spalte viel höher wird als die andere und dadurch
+// eine optisch unschöne graue Lücke rechts entsteht (bei CSS Grid mit
+// unterschiedlich hohen Items kann das sonst passieren)
+function splitIntoColumns(items, columns = 2) {
+  const cols = Array.from({ length: columns }, () => []);
+  items.forEach((item, i) => cols[i % columns].push(item));
+  return cols;
+}
 
+export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const isMobile = useIsMobile();
   const [tab,setTab]=useState("markets");
   const [news,setNews]=useState(NEWS_DEFAULT);
@@ -165,6 +172,9 @@ export default function App() {
   });
 
   const TABS=[["markets","Märkte"],["trades","Trades"],["news","News"],["calendar","Kalender"]];
+
+  // Trades auf 2 ausbalancierte Spalten verteilen (nur Desktop)
+  const tradeColumns = isMobile ? [trades] : splitIntoColumns(trades, 2);
 
   return (
     <>
@@ -244,7 +254,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TRADES */}
+          {/* TRADES — column-basiertes Layout statt Grid, verhindert graue Lücken */}
           {tab==="trades"&&(
             <div>
               <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:22}}>
@@ -256,8 +266,12 @@ export default function App() {
                   Aktualisiert sich automatisch 1x täglich im Hintergrund (06:00 UTC). Klick auf <strong style={{color:C.textHi}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:18}}>
-                {trades.map((g,i)=><TradeGroup key={g.asset||i} g={g}/>)}
+              <div style={{display:"flex",gap:18,alignItems:"flex-start",flexWrap:isMobile?"wrap":"nowrap"}}>
+                {tradeColumns.map((col, ci) => (
+                  <div key={ci} style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:18 }}>
+                    {col.map((g,i)=><TradeGroup key={g.asset||`${ci}-${i}`} g={g}/>)}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -271,8 +285,12 @@ export default function App() {
                   {newsUpdated && <span style={{color:C.bull,marginLeft:8}}>· ✓ Aktualisiert: {formatTimestamp(newsUpdated)}</span>}
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,alignItems:"start"}}>
-                {news.map((n,i)=><NewsCard key={i} n={n}/>)}
+              <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:isMobile?"wrap":"nowrap"}}>
+                {(isMobile ? [news] : splitIntoColumns(news, 2)).map((col, ci) => (
+                  <div key={ci} style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:16 }}>
+                    {col.map((n,i)=><NewsCard key={`${ci}-${i}`} n={n}/>)}
+                  </div>
+                ))}
               </div>
             </div>
           )}
