@@ -4,6 +4,7 @@ import TradeGroup from "./components/TradeCard";
 import NewsCard from "./components/NewsCard";
 import CalendarView from "./components/CalendarView";
 import NewsTicker from "./components/NewsTicker";
+import DashboardLogo from "./components/DashboardLogo";
 import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v2";
 import { ASSETS, TOTAL_MARKET_CAP_LINK } from "./data/assets";
 import { TRADES as DEFAULT_TRADES } from "./data/trades";
@@ -11,10 +12,10 @@ import { NEWS_DEFAULT } from "./data/news";
 import { C, FONT, RADIUS } from "./styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP v10 — ECHTES BACKEND
-// News + Trades kommen jetzt von /api/get-data (gefüllt durch Cron-Job 2x täglich)
-// Kein CORS-Problem mehr, kein manuelles Update mehr nötig
-// Preise weiterhin live im Browser (CoinGecko/Frankfurter/Yahoo — kein Auth nötig)
+// APP v11
+// - Live-Ticker zeigt jetzt echte Preise (liveAssets wird übergeben)
+// - DashboardLogo als eigene importierte Komponente (Batman-Style, austauschbar)
+// - Cron läuft nur 1x täglich (Hobby-Plan-Limit) — manueller Trigger für 2. Update
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchCryptoPrices() {
@@ -77,7 +78,6 @@ function fmtPrice(price,id) {
   return price.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
-// ── NEWS + TRADES VOM EIGENEN BACKEND HOLEN ──────────────────────────────────
 async function fetchBackendData() {
   const res = await fetch("/api/get-data");
   if (!res.ok) throw new Error(`Backend ${res.status}`);
@@ -92,30 +92,8 @@ function useIsMobile() {
 
 function formatTimestamp(iso) {
   if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleString("de-AT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
-  } catch { return null; }
-}
-
-function DashboardLogo() {
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:14}}>
-      <div style={{
-        width:44,height:44,
-        background:"linear-gradient(135deg,#f0b429,#d4920a)",
-        borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",
-        boxShadow:"0 4px 16px rgba(240,180,41,0.35)",flexShrink:0,
-      }}>
-        <span style={{fontFamily:"Georgia,serif",fontSize:22,fontWeight:900,color:C.bg,letterSpacing:"-0.02em",lineHeight:1}}>M</span>
-      </div>
-      <div>
-        <div style={{fontFamily:"Georgia,serif",fontSize:26,fontWeight:700,color:C.textHi,letterSpacing:"0.08em",textTransform:"uppercase",lineHeight:1}}>
-          MEIN <span style={{color:C.gold,letterSpacing:"0.12em"}}>DASHBOARD</span>
-        </div>
-        <div style={{fontSize:11,color:C.textLow,marginTop:3,letterSpacing:"0.04em"}}>Elliott-Wave · Live Markets · AI Analysis</div>
-      </div>
-    </div>
-  );
+  try { return new Date(iso).toLocaleString("de-AT", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" }); }
+  catch { return null; }
 }
 
 export default function App() {
@@ -132,7 +110,6 @@ export default function App() {
   const [lastFetch,setLastFetch]=useState(null);
   const [priceErr,setPriceErr]=useState(null);
 
-  // ── Preise: weiterhin live im Browser, alle 30s ──────────────────────────
   const loadPrices = useCallback(async () => {
     try {
       const [c,m,mk] = await Promise.allSettled([fetchCryptoPrices(),fetchMetalPrices(),fetchMacroPrices()]);
@@ -144,7 +121,6 @@ export default function App() {
     } catch(e) { setPriceErr(e.message); }
   },[]);
 
-  // ── News + Trades: vom eigenen Backend, beim Laden + alle 10 Min prüfen ──
   const loadBackendData = useCallback(async () => {
     try {
       const data = await fetchBackendData();
@@ -152,14 +128,13 @@ export default function App() {
       if (data.trades?.length) { setTrades(data.trades); setTradesUpdated(data.tradesUpdated); }
       setBackendErr(null);
     } catch(e) {
-      setBackendErr("Backend noch nicht eingerichtet — Standarddaten aktiv");
+      setBackendErr("Backend noch nicht erreichbar — Standarddaten aktiv");
     }
   },[]);
 
   useEffect(()=>{ loadPrices(); const iv=setInterval(loadPrices,30000); return()=>clearInterval(iv); },[loadPrices]);
   useEffect(()=>{
     loadBackendData();
-    // Alle 10 Minuten prüfen ob der Cron-Job neue Daten geliefert hat
     const iv = setInterval(loadBackendData, 10*60*1000);
     return()=>clearInterval(iv);
   },[loadBackendData]);
@@ -183,12 +158,7 @@ export default function App() {
     const live = macroPrices?.[m.id];
     if (live) {
       const decimals = ["wti","dxy","us10y","vix"].includes(m.id) ? 2 : 0;
-      return {
-        ...m,
-        p: live.price.toLocaleString("de-DE",{minimumFractionDigits:decimals,maximumFractionDigits:decimals}) + (m.id==="us10y"?"%":""),
-        ch: live.chg,
-        isLive: true,
-      };
+      return { ...m, p: live.price.toLocaleString("de-DE",{minimumFractionDigits:decimals,maximumFractionDigits:decimals}) + (m.id==="us10y"?"%":""), ch: live.chg, isLive: true };
     }
     return { ...m, isLive: false };
   });
@@ -211,28 +181,29 @@ export default function App() {
                 </div>
               )}
               <a href={TOTAL_MARKET_CAP_LINK} target="_blank" rel="noopener noreferrer"
-                style={{display:"flex",alignItems:"center",gap:5,background:C.surface,border:`1px solid ${C.blue}44`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.blue,fontSize:12,fontWeight:700,textDecoration:"none"}}>
+                style={{display:"flex",alignItems:"center",gap:5,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
                 🌐 {isMobile?"TOTAL":"Total Market"}
               </a>
               <a href="https://terminal.mcoglobal.live/" target="_blank" rel="noopener noreferrer"
-                style={{display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.purple}55`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.purple,fontSize:12,fontWeight:700,textDecoration:"none"}}>
+                style={{display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
                 🔗 {isMobile?"MCO":"MCO Terminal"}
               </a>
             </div>
           </div>
           {priceErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#160606",border:`1px solid ${C.bear}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.bear}}>⚠️ {priceErr}</div>}
-          {backendErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#1a1500",border:`1px solid ${C.gold}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.gold}}>ℹ️ {backendErr}</div>}
+          {backendErr&&<div style={{marginTop:8,padding:"6px 12px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.sm,fontSize:11,color:C.textMid}}>ℹ️ {backendErr}</div>}
         </header>
 
-        <NewsTicker isMobile={isMobile}/>
+        {/* Live-Ticker bekommt jetzt echte Preise übergeben */}
+        <NewsTicker isMobile={isMobile} liveAssets={liveAssets}/>
 
         <div style={{display:"flex",gap:7,marginBottom:24}}>
           {TABS.map(([id,lbl])=>(
             <button key={id} onClick={()=>setTab(id)} style={{
               flex:1,padding:isMobile?"11px 0":"14px 0",
               background:tab===id?C.surface:"transparent",
-              border:tab===id?`1px solid ${C.gold}55`:`1px solid ${C.border}`,
-              borderRadius:RADIUS.md,color:tab===id?C.gold:C.textMid,
+              border:tab===id?`1px solid ${C.borderHi}`:`1px solid ${C.border}`,
+              borderRadius:RADIUS.md,color:tab===id?C.textHi:C.textMid,
               fontSize:isMobile?14:16,fontWeight:600,cursor:"pointer",transition:"all 0.15s",
             }}>{lbl}</button>
           ))}
@@ -273,13 +244,13 @@ export default function App() {
         {/* TRADES */}
         {tab==="trades"&&(
           <div>
-            <div style={{background:C.surface,border:`1px solid ${C.gold}44`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:22}}>
+            <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:22}}>
               <div style={{fontSize:15,color:C.textHi,fontWeight:600,marginBottom:6}}>
                 〰️ Elliott-Wave Trade-Setups
                 {tradesUpdated && <span style={{fontSize:13,color:C.bull,fontWeight:400,marginLeft:12}}>✓ Automatisch aktualisiert: {formatTimestamp(tradesUpdated)}</span>}
               </div>
               <div style={{fontSize:13,color:C.textMid}}>
-                Aktualisiert sich automatisch 2x täglich im Hintergrund (06:00 + 18:00 UTC). Klick auf <strong style={{color:C.gold}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
+                Aktualisiert sich automatisch 1x täglich im Hintergrund (06:00 UTC). Klick auf <strong style={{color:C.textHi}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:18}}>
@@ -312,7 +283,7 @@ export default function App() {
         )}
 
         <div style={{marginTop:40,fontSize:12,color:C.textLow,textAlign:"center",lineHeight:2}}>
-          CoinGecko · Frankfurter API · Yahoo Finance · Claude AI (automatisch 2x täglich) · keine Anlageberatung
+          CoinGecko · Frankfurter API · Yahoo Finance · Claude AI (automatisch täglich) · keine Anlageberatung
         </div>
       </div>
     </div>
