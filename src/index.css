@@ -1,0 +1,42 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   GLOBAL CSS — Komplett schwarzer Hintergrund, auch außerhalb der App
+   Behebt: weiße Ränder beim Scrollen, weiße Browser-Standard-Scrollbar
+   ───────────────────────────────────────────────────────────────────────── */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000000;
+  min-height: 100%;
+}
+
+#root {
+  background: #000000;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbar — dunkel statt Browser-Standard-Weiß (Chrome/Edge/Safari) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #2e2e2e;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}
+
+/* Scrollbar — Firefox */
+html {
+  scrollbar-color: #2e2e2e #000000;
+  scrollbar-width: thin;
+}
