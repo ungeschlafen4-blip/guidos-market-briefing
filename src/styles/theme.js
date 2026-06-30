@@ -1,40 +1,40 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// THEME — Design Tokens
-// Dark Terminal · Minimalist · High Contrast
+// THEME v2 — Schwarz-Weiß / Batman-Stil
+// Nur Grün (bullish) und Rot (bearish) als Akzentfarben — Gold raus
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const C = {
-  // Backgrounds — layered depth
-  bg:       "#06070a",   // deepest background
-  surface:  "#0c0e14",   // cards, panels
-  card:     "#111420",   // elevated cards
-  cardHov:  "#161a27",   // hover state
-  overlay:  "rgba(0,0,0,0.88)", // modal backdrop
+  // Backgrounds — reines Schwarz/Grau, kein Gold-Touch mehr
+  bg:       "#000000",   // tiefstes Schwarz
+  surface:  "#0a0a0a",   // Karten, Panels
+  card:     "#101010",   // erhöhte Karten
+  cardHov:  "#161616",   // Hover-Zustand
+  overlay:  "rgba(0,0,0,0.92)", // Modal-Backdrop
 
-  // Borders
-  border:   "#1a1e2c",
-  borderHi: "#252b3e",
-  borderGlow: "rgba(240,180,41,0.2)", // gold glow on focus
+  // Borders — neutrale Graustufen
+  border:   "#1f1f1f",
+  borderHi: "#2e2e2e",
+  borderGlow: "rgba(255,255,255,0.12)", // weißes Glow statt Gold
 
-  // Semantic colors
-  bull:     "#2ecc71",   // green — up/long/bullish
-  bear:     "#e74c3c",   // red — down/short/bearish
-  gold:     "#f0b429",   // gold — neutral/highlight
-  blue:     "#3b82f6",   // blue — info/links
-  purple:   "#8b5cf6",   // purple — MCO/special
-  gray:     "#374151",   // gray — low-impact events
+  // Semantische Farben — NUR Grün/Rot bleiben farbig
+  bull:     "#2ecc71",   // grün — up/long/bullish
+  bear:     "#e74c3c",   // rot — down/short/bearish
+  gold:     "#e8e8e8",   // "gold" jetzt eigentlich helles Grau/Weiß als Akzent
+  blue:     "#9ca3af",   // statt blau: neutrales Grau
+  purple:   "#d1d5db",   // statt lila: helles Grau
+  gray:     "#374151",   // bleibt für Kalender-Feiertage
 
-  // Text hierarchy
-  textHi:   "#eceae2",   // primary text
-  textMid:  "#8892a4",   // secondary text
-  textLow:  "#3d4455",   // muted text
-  textGold: "#f0b429",   // highlight text
+  // Text-Hierarchie
+  textHi:   "#fafafa",   // primärer Text — fast reines Weiß
+  textMid:  "#9ca3af",   // sekundärer Text — neutrales Grau
+  textLow:  "#52525b",   // gedämpfter Text
+  textGold: "#e8e8e8",   // Highlight-Text — jetzt Weiß statt Gold
 
-  // Impact colors
-  impH:     "#e74c3c",   // high impact
-  impM:     "#f0b429",   // medium impact
-  impL:     "#3b82f6",   // low impact
-  impN:     "#374151",   // no impact / holiday
+  // Impact-Farben (Kalender)
+  impH:     "#e74c3c",   // hoher Impact — bleibt rot
+  impM:     "#a3a3a3",   // mittlerer Impact — grau statt gold
+  impL:     "#6b7280",   // niedriger Impact — dunkleres grau statt blau
+  impN:     "#374151",   // Feiertag/kein Markt
 };
 
 export const FONT = {
@@ -51,14 +51,14 @@ export const RADIUS = {
 };
 
 export const SHADOW = {
-  card:  "0 4px 20px rgba(0,0,0,0.4)",
-  modal: "0 24px 80px rgba(0,0,0,0.8)",
+  card:  "0 4px 20px rgba(0,0,0,0.6)",
+  modal: "0 24px 80px rgba(0,0,0,0.9)",
   glow:  (color) => `0 0 20px ${color}33, 0 0 40px ${color}11`,
 };
 
 export const BIAS_COL = {
   bull:    C.bull,
-  neutral: C.gold,
+  neutral: C.textMid,   // statt Gold: neutrales Grau
   bear:    C.bear,
 };
 
@@ -72,5 +72,5 @@ export const IMP_COL = {
   H: C.impH,
   M: C.impM,
   L: C.impL,
-  N: C.impN,  // holiday/no market
+  N: C.impN,
 };
