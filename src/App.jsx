@@ -5,6 +5,7 @@ import NewsCard from "./components/NewsCard";
 import CalendarView from "./components/CalendarView";
 import NewsTicker from "./components/NewsTicker";
 import DashboardLogo from "./components/DashboardLogo";
+import SplashScreen from "./components/SplashScreen";
 import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v2";
 import { ASSETS, TOTAL_MARKET_CAP_LINK } from "./data/assets";
 import { TRADES as DEFAULT_TRADES } from "./data/trades";
@@ -12,10 +13,7 @@ import { NEWS_DEFAULT } from "./data/news";
 import { C, FONT, RADIUS } from "./styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP v11
-// - Live-Ticker zeigt jetzt echte Preise (liveAssets wird übergeben)
-// - DashboardLogo als eigene importierte Komponente (Batman-Style, austauschbar)
-// - Cron läuft nur 1x täglich (Hobby-Plan-Limit) — manueller Trigger für 2. Update
+// APP v12 — Splash-Screen beim Start + neuer Ticker mit Live-Sync
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchCryptoPrices() {
@@ -53,9 +51,7 @@ async function fetchMacroPrices() {
   await Promise.allSettled(
     Object.entries(YAHOO_SYMBOLS).map(async ([id, sym]) => {
       try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=5d`;
-        const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const res = await fetch(proxied);
+        const res = await fetch(`/api/yahoo-proxy?symbol=${encodeURIComponent(sym)}&range=5d&interval=1d`);
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
         const meta = data?.chart?.result?.[0]?.meta;
@@ -97,6 +93,11 @@ function formatTimestamp(iso) {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(() => {
+    // Nur beim echten Laden/Refresh zeigen, nicht bei jedem internen State-Update
+    return true;
+  });
+
   const isMobile = useIsMobile();
   const [tab,setTab]=useState("markets");
   const [news,setNews]=useState(NEWS_DEFAULT);
@@ -166,127 +167,130 @@ export default function App() {
   const TABS=[["markets","Märkte"],["trades","Trades"],["news","News"],["calendar","Kalender"]];
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,color:C.textHi,fontFamily:FONT.sans}}>
-      <div style={{maxWidth:1500,margin:"0 auto",padding:isMobile?"14px 14px 60px":"28px 50px 60px"}}>
+    <>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
 
-        <header style={{borderBottom:`1px solid ${C.border}`,paddingBottom:18,marginBottom:18}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-            <DashboardLogo/>
-            <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-              {lastFetch && (
-                <div style={{fontSize:12,color:C.textLow,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  <span style={{color:C.bull}}>●</span> Preise: {lastFetch}
-                  {newsUpdated && <span>· News: {formatTimestamp(newsUpdated)}</span>}
-                  {tradesUpdated && <span>· Trades: {formatTimestamp(tradesUpdated)}</span>}
+      <div style={{minHeight:"100vh",background:C.bg,color:C.textHi,fontFamily:FONT.sans}}>
+        <div style={{maxWidth:1500,margin:"0 auto",padding:isMobile?"14px 14px 60px":"28px 50px 60px"}}>
+
+          <header style={{borderBottom:`1px solid ${C.border}`,paddingBottom:18,marginBottom:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              <DashboardLogo/>
+              <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                {lastFetch && (
+                  <div style={{fontSize:12,color:C.textLow,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{color:C.bull}}>●</span> Preise: {lastFetch}
+                    {newsUpdated && <span>· News: {formatTimestamp(newsUpdated)}</span>}
+                    {tradesUpdated && <span>· Trades: {formatTimestamp(tradesUpdated)}</span>}
+                  </div>
+                )}
+                <a href={TOTAL_MARKET_CAP_LINK} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",alignItems:"center",gap:5,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
+                  🌐 {isMobile?"TOTAL":"Total Market"}
+                </a>
+                <a href="https://terminal.mcoglobal.live/" target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
+                  🔗 {isMobile?"MCO":"MCO Terminal"}
+                </a>
+              </div>
+            </div>
+            {priceErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#160606",border:`1px solid ${C.bear}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.bear}}>⚠️ {priceErr}</div>}
+            {backendErr&&<div style={{marginTop:8,padding:"6px 12px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.sm,fontSize:11,color:C.textMid}}>ℹ️ {backendErr}</div>}
+          </header>
+
+          <NewsTicker isMobile={isMobile} liveAssets={liveAssets}/>
+
+          <div style={{display:"flex",gap:7,marginBottom:24}}>
+            {TABS.map(([id,lbl])=>(
+              <button key={id} onClick={()=>setTab(id)} style={{
+                flex:1,padding:isMobile?"11px 0":"14px 0",
+                background:tab===id?C.surface:"transparent",
+                border:tab===id?`1px solid ${C.borderHi}`:`1px solid ${C.border}`,
+                borderRadius:RADIUS.md,color:tab===id?C.textHi:C.textMid,
+                fontSize:isMobile?14:16,fontWeight:600,cursor:"pointer",transition:"all 0.15s",
+              }}>{lbl}</button>
+            ))}
+          </div>
+
+          {/* MÄRKTE */}
+          {tab==="markets"&&(
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:20}}>
+              <div>
+                <SLabel>KRYPTO — Live via Binance WebSocket</SLabel>
+                <div style={{display:"flex",flexDirection:"column",gap:18}}>
+                  {liveAssets.filter(a=>["sol","btc","eth"].includes(a.id)).map(a=><AssetCard key={a.id} a={a}/>)}
                 </div>
-              )}
-              <a href={TOTAL_MARKET_CAP_LINK} target="_blank" rel="noopener noreferrer"
-                style={{display:"flex",alignItems:"center",gap:5,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
-                🌐 {isMobile?"TOTAL":"Total Market"}
-              </a>
-              <a href="https://terminal.mcoglobal.live/" target="_blank" rel="noopener noreferrer"
-                style={{display:"flex",alignItems:"center",gap:6,background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"9px 14px",color:C.textMid,fontSize:12,fontWeight:700,textDecoration:"none"}}>
-                🔗 {isMobile?"MCO":"MCO Terminal"}
-              </a>
+              </div>
+              <div>
+                <SLabel>ROHSTOFFE — Live via Frankfurter API</SLabel>
+                <div style={{display:"flex",flexDirection:"column",gap:18,marginBottom:28}}>
+                  {liveAssets.filter(a=>["gold","silver"].includes(a.id)).map(a=>(
+                    <div key={a.id} style={{position:"relative"}}>
+                      <AssetCard a={a}/>
+                      {!a.isLive && <div style={{position:"absolute",top:14,right:14,fontSize:10,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 8px"}}>SNAPSHOT</div>}
+                    </div>
+                  ))}
+                </div>
+                <SLabel>MAKRO — Live via Yahoo Finance</SLabel>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  {liveMacro.map(m=>(
+                    <div key={m.n} style={{position:"relative"}}>
+                      <MacroTile m={m}/>
+                      {!m.isLive && <div style={{position:"absolute",top:10,right:10,fontSize:9,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 6px"}}>SNAPSHOT</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-          {priceErr&&<div style={{marginTop:8,padding:"6px 12px",background:"#160606",border:`1px solid ${C.bear}44`,borderRadius:RADIUS.sm,fontSize:11,color:C.bear}}>⚠️ {priceErr}</div>}
-          {backendErr&&<div style={{marginTop:8,padding:"6px 12px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.sm,fontSize:11,color:C.textMid}}>ℹ️ {backendErr}</div>}
-        </header>
+          )}
 
-        {/* Live-Ticker bekommt jetzt echte Preise übergeben */}
-        <NewsTicker isMobile={isMobile} liveAssets={liveAssets}/>
-
-        <div style={{display:"flex",gap:7,marginBottom:24}}>
-          {TABS.map(([id,lbl])=>(
-            <button key={id} onClick={()=>setTab(id)} style={{
-              flex:1,padding:isMobile?"11px 0":"14px 0",
-              background:tab===id?C.surface:"transparent",
-              border:tab===id?`1px solid ${C.borderHi}`:`1px solid ${C.border}`,
-              borderRadius:RADIUS.md,color:tab===id?C.textHi:C.textMid,
-              fontSize:isMobile?14:16,fontWeight:600,cursor:"pointer",transition:"all 0.15s",
-            }}>{lbl}</button>
-          ))}
-        </div>
-
-        {/* MÄRKTE */}
-        {tab==="markets"&&(
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:20}}>
+          {/* TRADES */}
+          {tab==="trades"&&(
             <div>
-              <SLabel>KRYPTO — Live via CoinGecko</SLabel>
-              <div style={{display:"flex",flexDirection:"column",gap:18}}>
-                {liveAssets.filter(a=>["sol","btc","eth"].includes(a.id)).map(a=><AssetCard key={a.id} a={a}/>)}
+              <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:22}}>
+                <div style={{fontSize:15,color:C.textHi,fontWeight:600,marginBottom:6}}>
+                  〰️ Elliott-Wave Trade-Setups
+                  {tradesUpdated && <span style={{fontSize:13,color:C.bull,fontWeight:400,marginLeft:12}}>✓ Automatisch aktualisiert: {formatTimestamp(tradesUpdated)}</span>}
+                </div>
+                <div style={{fontSize:13,color:C.textMid}}>
+                  Aktualisiert sich automatisch 1x täglich im Hintergrund (06:00 UTC). Klick auf <strong style={{color:C.textHi}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:18}}>
+                {trades.map((g,i)=><TradeGroup key={g.asset||i} g={g}/>)}
               </div>
             </div>
+          )}
+
+          {/* NEWS */}
+          {tab==="news"&&(
             <div>
-              <SLabel>ROHSTOFFE — Live via Frankfurter API</SLabel>
-              <div style={{display:"flex",flexDirection:"column",gap:18,marginBottom:28}}>
-                {liveAssets.filter(a=>["gold","silver"].includes(a.id)).map(a=>(
-                  <div key={a.id} style={{position:"relative"}}>
-                    <AssetCard a={a}/>
-                    {!a.isLive && <div style={{position:"absolute",top:14,right:14,fontSize:10,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 8px"}}>SNAPSHOT</div>}
-                  </div>
-                ))}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
+                <div style={{fontSize:14,color:C.textLow}}>
+                  Klick → vollständige Analyse + Fachbegriff-Erklärungen
+                  {newsUpdated && <span style={{color:C.bull,marginLeft:8}}>· ✓ Aktualisiert: {formatTimestamp(newsUpdated)}</span>}
+                </div>
               </div>
-              <SLabel>MAKRO — Live via Yahoo Finance</SLabel>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                {liveMacro.map(m=>(
-                  <div key={m.n} style={{position:"relative"}}>
-                    <MacroTile m={m}/>
-                    {!m.isLive && <div style={{position:"absolute",top:10,right:10,fontSize:9,fontWeight:700,color:C.textLow,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 6px"}}>SNAPSHOT</div>}
-                  </div>
-                ))}
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,alignItems:"start"}}>
+                {news.map((n,i)=><NewsCard key={i} n={n}/>)}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* TRADES */}
-        {tab==="trades"&&(
-          <div>
-            <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:RADIUS.md,padding:"16px 20px",marginBottom:22}}>
-              <div style={{fontSize:15,color:C.textHi,fontWeight:600,marginBottom:6}}>
-                〰️ Elliott-Wave Trade-Setups
-                {tradesUpdated && <span style={{fontSize:13,color:C.bull,fontWeight:400,marginLeft:12}}>✓ Automatisch aktualisiert: {formatTimestamp(tradesUpdated)}</span>}
-              </div>
-              <div style={{fontSize:13,color:C.textMid}}>
-                Aktualisiert sich automatisch 1x täglich im Hintergrund (06:00 UTC). Klick auf <strong style={{color:C.textHi}}>「〰️ Übergeordnete Struktur」</strong> für Weekly-Chart + Wellen-Vorschau.
-              </div>
+          {/* KALENDER */}
+          {tab==="calendar"&&(
+            <div>
+              <div style={{fontSize:14,color:C.textLow,marginBottom:18}}>Klick auf einen Tag → vollständige Tagesübersicht mit Events und BTC/ETH-Impact</div>
+              <CalendarView/>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:18}}>
-              {trades.map((g,i)=><TradeGroup key={g.asset||i} g={g}/>)}
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* NEWS */}
-        {tab==="news"&&(
-          <div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
-              <div style={{fontSize:14,color:C.textLow}}>
-                Klick → vollständige Analyse + Fachbegriff-Erklärungen
-                {newsUpdated && <span style={{color:C.bull,marginLeft:8}}>· ✓ Aktualisiert: {formatTimestamp(newsUpdated)}</span>}
-              </div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,alignItems:"start"}}>
-              {news.map((n,i)=><NewsCard key={i} n={n}/>)}
-            </div>
+          <div style={{marginTop:40,fontSize:12,color:C.textLow,textAlign:"center",lineHeight:2}}>
+            Binance WebSocket · Yahoo Finance · Claude AI (automatisch täglich) · keine Anlageberatung
           </div>
-        )}
-
-        {/* KALENDER */}
-        {tab==="calendar"&&(
-          <div>
-            <div style={{fontSize:14,color:C.textLow,marginBottom:18}}>Klick auf einen Tag → vollständige Tagesübersicht mit Events und BTC/ETH-Impact</div>
-            <CalendarView/>
-          </div>
-        )}
-
-        <div style={{marginTop:40,fontSize:12,color:C.textLow,textAlign:"center",lineHeight:2}}>
-          CoinGecko · Frankfurter API · Yahoo Finance · Claude AI (automatisch täglich) · keine Anlageberatung
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
