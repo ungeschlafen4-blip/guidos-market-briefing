@@ -2,91 +2,147 @@ import React, { useEffect, useState, useRef } from "react";
 import { C } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SPLASH SCREEN v2 — Länger (4s), Wort-für-Wort-Begrüßung, optionaler Sound
-// Sound-Datei: /public/intro-sound.mp3 (falls vorhanden, sonst stumm)
-// Browser blocken Auto-Play mit Ton ohne Nutzer-Interaktion teilweise —
-// daher try/catch beim Abspielen, damit nichts crasht falls es blockiert wird.
+// SPLASH SCREEN v3 — Spy/007-Style Intro, abgestimmt auf 7s Sound-Clip
+// - Logo zoomt mit kurzem "Schärfe rein"-Effekt (wie ein Kamera-Fokus)
+// - Text wird Buchstabe für Buchstabe getippt (Schreibmaschinen-Effekt)
+// - Dezente Scanline/Glow-Bewegung im Hintergrund für "Geheimagent"-Feeling
+// - Sound spielt automatisch, fadet in der letzten Sekunde sanft aus
+// - Gesamtdauer: ~7.2s, synchron zur Musiklänge
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GREETING_WORDS = ["Willkommen", "Guido."];
+const GREETING_TEXT = "Willkommen, Guido.";
+const AUDIO_DURATION = 7.0; // Sekunden, ermittelt aus der Datei
+const FADE_OUT_START = AUDIO_DURATION - 1.0; // letzte Sekunde fadet aus
+const TOTAL_DURATION = AUDIO_DURATION + 0.3; // kleiner Puffer bis Übergang
 
 export default function SplashScreen({ onDone }) {
-  const [phase, setPhase] = useState("zoom"); // zoom -> words -> hold -> fadeOut
-  const [visibleWords, setVisibleWords] = useState(0);
+  const [phase, setPhase] = useState("focus"); // focus -> typing -> hold -> fadeOut
+  const [typedChars, setTypedChars] = useState(0);
   const audioRef = useRef(null);
+  const fadeIntervalRef = useRef(null);
 
   useEffect(() => {
-    // Sound versuchen abzuspielen (falls Datei vorhanden)
+    // Sound starten
     if (audioRef.current) {
-      audioRef.current.volume = 0.5;
-      audioRef.current.play().catch(() => { /* Autoplay blockiert — kein Problem, läuft stumm weiter */ });
+      audioRef.current.volume = 0.55;
+      audioRef.current.play().catch(() => { /* Autoplay evtl. blockiert — Intro läuft optisch trotzdem */ });
     }
 
-    const t1 = setTimeout(() => setPhase("words"), 800);
+    // Logo-Fokus-Phase
+    const t1 = setTimeout(() => setPhase("typing"), 900);
 
-    // Wörter nacheinander einblenden
-    const wordTimers = GREETING_WORDS.map((_, i) =>
-      setTimeout(() => setVisibleWords(i + 1), 800 + i * 450)
-    );
+    // Schreibmaschinen-Effekt: Buchstabe für Buchstabe, etwas unregelmäßig wie echtes Tippen
+    let charIndex = 0;
+    const typeNextChar = () => {
+      if (charIndex <= GREETING_TEXT.length) {
+        setTypedChars(charIndex);
+        charIndex++;
+        const delay = 55 + Math.random() * 70; // leicht unregelmäßiges Tippen
+        typingTimerRef.current = setTimeout(typeNextChar, delay);
+      }
+    };
+    const typingTimerRef = { current: null };
+    const typingStart = setTimeout(typeNextChar, 950);
 
-    const t2 = setTimeout(() => setPhase("hold"), 800 + GREETING_WORDS.length * 450 + 600);
-    const t3 = setTimeout(() => setPhase("fadeOut"), 3400);
-    const t4 = setTimeout(() => onDone(), 4000);
+    // Sound-Fadeout in der letzten Sekunde
+    const fadeStart = setTimeout(() => {
+      if (!audioRef.current) return;
+      const fadeSteps = 20;
+      const stepTime = 1000 / fadeSteps;
+      let step = 0;
+      fadeIntervalRef.current = setInterval(() => {
+        step++;
+        if (audioRef.current) {
+          audioRef.current.volume = Math.max(0, 0.55 * (1 - step / fadeSteps));
+        }
+        if (step >= fadeSteps) clearInterval(fadeIntervalRef.current);
+      }, stepTime);
+    }, FADE_OUT_START * 1000);
+
+    // Visueller Fadeout kurz vor Ende
+    const t2 = setTimeout(() => setPhase("fadeOut"), (TOTAL_DURATION - 0.6) * 1000);
+    const t3 = setTimeout(() => {
+      if (audioRef.current) audioRef.current.pause();
+      onDone();
+    }, TOTAL_DURATION * 1000);
 
     return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
-      wordTimers.forEach(clearTimeout);
+      clearTimeout(t1); clearTimeout(typingStart); clearTimeout(fadeStart);
+      clearTimeout(t2); clearTimeout(t3);
+      clearTimeout(typingTimerRef.current);
+      clearInterval(fadeIntervalRef.current);
     };
   }, [onDone]);
+
+  const displayedText = GREETING_TEXT.slice(0, typedChars);
+  const showCursor = phase === "typing" && typedChars < GREETING_TEXT.length;
 
   return (
     <div style={{
       position:"fixed", inset:0, zIndex:9999,
       background:"#000000",
       display:"flex", alignItems:"center", justifyContent:"center",
-      flexDirection:"column", gap:28,
+      flexDirection:"column", gap:32,
       opacity: phase==="fadeOut" ? 0 : 1,
       transition:"opacity 0.6s ease",
       pointerEvents: phase==="fadeOut" ? "none" : "auto",
+      overflow:"hidden",
     }}>
-      {/* Optionaler Sound — Datei muss unter /public/intro-sound.mp3 liegen */}
       <audio ref={audioRef} src="/intro-sound.mp3" preload="auto" />
 
+      {/* Dezente bewegte Scanline im Hintergrund — Spy-Feeling */}
       <div style={{
-        width:96, height:96,
+        position:"absolute", inset:0, pointerEvents:"none",
+        background:"linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.02) 50%, transparent 100%)",
+        backgroundSize:"100% 200%",
+        animation:"scanMove 4s linear infinite",
+      }}/>
+
+      {/* Logo mit Kamera-Fokus-Effekt */}
+      <div style={{
+        width:100, height:100,
         background:"linear-gradient(135deg,#1a1a1a,#000000)",
         border:`2px solid ${C.borderHi}`,
         borderRadius:18,
         display:"flex", alignItems:"center", justifyContent:"center",
-        boxShadow:"0 0 60px rgba(255,255,255,0.08)",
-        transform: phase==="zoom" ? "scale(0.3)" : "scale(1)",
-        opacity: phase==="zoom" ? 0 : 1,
-        transition:"transform 0.7s cubic-bezier(0.16,1,0.3,1), opacity 0.5s ease",
+        boxShadow: phase==="focus" ? "0 0 0 rgba(255,255,255,0)" : "0 0 70px rgba(255,255,255,0.1)",
+        transform: phase==="focus" ? "scale(1.4)" : "scale(1)",
+        filter: phase==="focus" ? "blur(8px)" : "blur(0px)",
+        opacity: phase==="focus" ? 0.3 : 1,
+        transition:"transform 0.9s cubic-bezier(0.16,1,0.3,1), filter 0.9s ease, opacity 0.7s ease, box-shadow 0.9s ease",
       }}>
-        <span style={{ fontFamily:"Georgia,serif", fontSize:52, fontWeight:900, color:"#fafafa", lineHeight:1 }}>G</span>
+        <span style={{ fontFamily:"Georgia,serif", fontSize:54, fontWeight:900, color:"#fafafa", lineHeight:1 }}>G</span>
       </div>
 
       <div style={{
         fontFamily:"Georgia,serif", fontSize:18, fontWeight:700,
-        color:C.textHi, letterSpacing:"0.18em", textTransform:"uppercase",
-        opacity: phase==="zoom" ? 0 : 1,
-        transition:"opacity 0.6s ease 0.3s",
+        color:C.textHi, letterSpacing:"0.2em", textTransform:"uppercase",
+        opacity: phase==="focus" ? 0 : 1,
+        transition:"opacity 0.7s ease 0.2s",
       }}>
         MEIN <span style={{ color:C.textMid }}>DASHBOARD</span>
       </div>
 
-      {/* Wort-für-Wort Begrüßung */}
-      <div style={{ display:"flex", gap:10, minHeight:32 }}>
-        {GREETING_WORDS.map((word, i) => (
-          <span key={i} style={{
-            fontFamily:"Georgia,serif", fontSize:24, fontWeight:400,
-            color: i === GREETING_WORDS.length - 1 ? C.textHi : C.textMid,
-            opacity: i < visibleWords ? 1 : 0,
-            transform: i < visibleWords ? "translateY(0)" : "translateY(8px)",
-            transition:"opacity 0.5s ease, transform 0.5s ease",
-          }}>{word}</span>
-        ))}
+      {/* Schreibmaschinen-Begrüßung */}
+      <div style={{ minHeight:36, display:"flex", alignItems:"center" }}>
+        <span style={{
+          fontFamily:"'Courier New', monospace", fontSize:22, fontWeight:600,
+          color:C.textHi, letterSpacing:"0.04em",
+        }}>
+          {displayedText}
+          {showCursor && (
+            <span style={{
+              display:"inline-block", width:11, height:22, background:C.textHi,
+              marginLeft:3, animation:"blink 0.7s step-end infinite", verticalAlign:"text-bottom",
+            }}/>
+          )}
+        </span>
       </div>
+
+      <style>{`
+        @keyframes blink { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
+        @keyframes scanMove { 0% { background-position: 0 -100% } 100% { background-position: 0 200% } }
+      `}</style>
     </div>
   );
 }
