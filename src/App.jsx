@@ -7,7 +7,7 @@ import NewsTicker from "./components/NewsTicker";
 import DashboardLogo from "./components/DashboardLogo";
 import SplashScreen from "./components/SplashScreen";
 import VoiceAssistant from "./components/VoiceAssistant";
-import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v2";
+import MacroTile, { MACRO_ASSETS as MACRO_BASE } from "./components/MacroTile_v5";
 import { ASSETS, TOTAL_MARKET_CAP_LINK } from "./data/assets";
 import { TRADES as DEFAULT_TRADES } from "./data/trades";
 import { NEWS_DEFAULT } from "./data/news";
@@ -101,7 +101,7 @@ export default function App() {
       if(d.news?.length){setNews(d.news);setNewsUpd(d.newsUpdated);}
       if(d.trades?.length){setTrades(d.trades);setTradesUpd(d.tradesUpdated);}
       setBackendErr(null);}
-    catch(){setBackendErr("Backend noch nicht erreichbar — Standarddaten aktiv");}
+    catch(e){setBackendErr("Backend noch nicht erreichbar — Standarddaten aktiv");}
   },[]);
 
   useEffect(()=>{loadPrices();const iv=setInterval(loadPrices,30000);return()=>clearInterval(iv);},[loadPrices]);
