@@ -3,23 +3,16 @@ import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianG
 import { C, FONT, RADIUS } from "../styles/theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UNIFIED CHART v4
-// - Krypto: echte Binance-Historie direkt (Binance erlaubt CORS, kein Proxy nötig)
-// - Gold/Silber/Makro: echte Yahoo-Historie über UNSEREN EIGENEN Proxy (/api/yahoo-proxy)
-//   statt des unzuverlässigen Drittanbieters allorigins.win
+// UNIFIED CHART v5
+// Historie weiterhin via Binance (Krypto) / eigener Yahoo-Proxy (Gold/Silber/Makro)
+// NEU: optional wird der allerletzte Punkt sanft an livePrice angeglichen,
+// damit Chart-Ende und Live-Preis-Anzeige in der Karte synchron wirken —
+// aber nur als kleine Korrektur am letzten Punkt, nicht als harter Sprung,
+// damit die Kurvenform (dein Hauptanliegen vorhin) erhalten bleibt.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BINANCE_SYMBOL = { btc: "BTCUSDT", eth: "ETHUSDT", sol: "SOLUSDT" };
-const YAHOO_SYMBOL = {
-  gold:   "GC=F",
-  silver: "SI=F",
-  spx:    "^GSPC",
-  ndx:    "^NDX",
-  wti:    "CL=F",
-  dxy:    "DX-Y.NYB",
-  us10y:  "^TNX",
-  vix:    "^VIX",
-};
+const YAHOO_SYMBOL = { gold:"GC=F", silver:"SI=F", spx:"^GSPC", ndx:"^NDX", wti:"CL=F", dxy:"DX-Y.NYB", us10y:"^TNX", vix:"^VIX" };
 
 const DAY_LABELS = ["So","Mo","Di","Mi","Do","Fr","Sa"];
 function formatDayLabel(date) { return DAY_LABELS[date.getDay()]; }
@@ -37,7 +30,6 @@ async function fetchBinanceHistory(symbol) {
   });
 }
 
-// ── Eigener Proxy statt allorigins.win ────────────────────────────────────────
 async function fetchYahooHistory(symbol) {
   const url = `/api/yahoo-proxy?symbol=${encodeURIComponent(symbol)}&range=7d&interval=1h`;
   const res = await fetch(url);
@@ -45,10 +37,8 @@ async function fetchYahooHistory(symbol) {
   const data = await res.json();
   const result = data?.chart?.result?.[0];
   if (!result) throw new Error("Keine Yahoo-Daten");
-
   const timestamps = result.timestamp || [];
   const closes = result.indicators?.quote?.[0]?.close || [];
-
   let lastDate = null;
   const points = [];
   for (let i = 0; i < timestamps.length; i++) {
@@ -77,7 +67,9 @@ function ChartTooltip({ active, payload, label, unit, decimals }) {
   );
 }
 
-export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
+// livePrice: optionaler aktueller Preis (vom WebSocket-Hook), um den letzten
+// Punkt sanft zu synchronisieren — fließt NICHT in die Kurvenform der Vergangenheit ein
+export default function UnifiedChart({ assetId, unit="$", h=240, levels=[], livePrice=null }) {
   const [data, setData] = useState(null);
   const [isLive, setIsLive] = useState(false);
   const isCrypto = !!BINANCE_SYMBOL[assetId];
@@ -94,17 +86,16 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
           const d = await fetchBinanceHistory(BINANCE_SYMBOL[assetId]);
           if (!cancelled) { setData(d); setIsLive(true); }
           return;
-        } catch { /* fällt durch */ }
+        } catch {}
       } else if (hasYahoo) {
         try {
           const d = await fetchYahooHistory(YAHOO_SYMBOL[assetId]);
           if (!cancelled) { setData(d); setIsLive(true); }
           return;
-        } catch { /* fällt durch */ }
+        } catch {}
       }
       if (!cancelled) { setData([]); setIsLive(false); }
     }
-
     load();
     return () => { cancelled = true; };
   }, [assetId, isCrypto, hasYahoo]);
@@ -117,7 +108,6 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
       </div>
     );
   }
-
   if (!data.length) {
     return (
       <div style={{ height:h, display:"flex", alignItems:"center", justifyContent:"center", color:C.textLow, fontSize:13, textAlign:"center", padding:"0 20px" }}>
@@ -126,15 +116,21 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
     );
   }
 
-  const vals = data.map(d=>d.p);
+  // Sanfte Synchronisation: nur den letzten Punkt auf livePrice setzen, Rest unangetastet
+  let displayData = data;
+  if (isCrypto && livePrice) {
+    displayData = [...data.slice(0, -1), { ...data[data.length-1], p: livePrice }];
+  }
+
+  const vals = displayData.map(d=>d.p);
   const mn = Math.min(...vals), mx = Math.max(...vals);
   const pad = (mx-mn)*0.1 || mn*0.01;
   const yMin = mn-pad, yMax = mx+pad;
 
   const decimals = assetId==="us10y" ? 2 : ["vix","sol","silver","wti","dxy"].includes(assetId) ? 2 : 0;
 
-  const start = data[0];
-  const end   = data[data.length-1];
+  const start = displayData[0];
+  const end   = displayData[displayData.length-1];
   const isUp  = end.p >= start.p;
   const trendCol = isUp ? C.bull : C.bear;
   const pctChange = (((end.p - start.p) / start.p) * 100).toFixed(1);
@@ -150,21 +146,12 @@ export default function UnifiedChart({ assetId, unit="$", h=240, levels=[] }) {
       </div>
 
       <ResponsiveContainer width="100%" height={h}>
-        <LineChart data={data} margin={{ top:24, right:16, left:4, bottom:24 }}>
+        <LineChart data={displayData} margin={{ top:24, right:16, left:4, bottom:24 }}>
           <CartesianGrid stroke={C.border} strokeDasharray="3 3"/>
-          <YAxis
-            domain={[yMin, yMax]}
-            tick={{ fill:C.textMid, fontSize:12, fontFamily:FONT.mono }} width={68}
+          <YAxis domain={[yMin, yMax]} tick={{ fill:C.textMid, fontSize:12, fontFamily:FONT.mono }} width={68}
             tickFormatter={v=>`${unit}${v>=1000?Math.round(v).toLocaleString("de-DE"):v.toFixed(decimals)}`}
-            axisLine={{ stroke:C.borderHi }} tickLine={{ stroke:C.border }}
-          />
-          <XAxis
-            dataKey="t"
-            tick={{ fill:C.textMid, fontSize:11 }}
-            axisLine={{ stroke:C.borderHi }} tickLine={{ stroke:C.border }}
-            interval={0}
-            height={28}
-          />
+            axisLine={{ stroke:C.borderHi }} tickLine={{ stroke:C.border }}/>
+          <XAxis dataKey="t" tick={{ fill:C.textMid, fontSize:11 }} axisLine={{ stroke:C.borderHi }} tickLine={{ stroke:C.border }} interval={0} height={28}/>
           <Tooltip content={<ChartTooltip unit={unit} decimals={decimals}/>} cursor={{ stroke:C.textHi, strokeWidth:1, strokeDasharray:"4 2" }}/>
           {levels.map((lv,i) => (
             <ReferenceLine key={i} y={lv.v} stroke={lv.col} strokeDasharray="5 3" strokeWidth={1.5}
