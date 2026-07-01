@@ -1,99 +1,69 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// NEWS DATA — mit Fachbegriff-Erklärungen
-// ─────────────────────────────────────────────────────────────────────────────
-
+// NEWS — Stand: 1. Juli 2026 — Manuell aktualisiert
 export const NEWS_DEFAULT = [
   {
-    tag:"KRYPTO", date:"27.06.", icon:"📊", impactCol:"#2ecc71", impact:"Bullisch kurz/mittelfristig",
-    title:"SOL +8% führt Post-Expiry-Rebound — stärkster Major-Coin",
-    summary:"SOL +8% nach Quarterly Options Expiry. Einziger Major mit positivem 7D-Return.",
-    full:`Nach dem Zyklusboden bei $58.189 (BTC) dreht der Markt am Freitag. Solana führt mit +8% auf $72,22 — angeführt von Aave und SOL-Ecosystem-Token.
-
-📌 Fachbegriffe erklärt:
-• Quarterly Options Expiry: Vierteljährlicher Verfallstag von Optionskontrakten. An diesem Tag werden Milliarden an Derivate-Positionen abgerechnet — oft erhöhte Volatilität, danach oft Richtungsumkehr.
-• Max Pain ($61.000): Der Preis, bei dem die meisten Optionen wertlos verfallen. Kurs wird oft magnetisch angezogen.
-• Fear & Greed Index (12): Misst Marktsentiment von 0 (Extreme Fear = panikartiger Ausverkauf) bis 100 (Extreme Greed = euphorische Käufe). Wert 12 = historisch oft in Bodennähe — contrarian bullisch.
-• Post-Expiry-Bounce: Typische Erholung nach Verfallstag wenn der Liquidationsdruck nachlässt.
-
-📈 Auswirkung auf Krypto:
-Extreme Fear + Post-Expiry-Bounce ist historisch ein starkes mittelfristiges Setup. SOL zeigt die sauberste Elliott-Wellen-Struktur (5-Wellen-Ende bei $64,80) und stärkste relative Performance (+0,5% 7D vs. Markt -5%).`,
+    tag:"KRYPTO",
+    date:"01.07.2026",
+    icon:"₿",
+    title:"Bitcoin kämpft um $60.000 — Pivotal Week für BTC",
+    summary:"Bitcoin schwebt knapp unter der $60.000-Marke nach anhaltenden ETF-Abflüssen. Analysten warnen vor einem möglichen Test der 200-Wochen-MA.",
+    full:"Bitcoin handelt bei ~$58.500 und kämpft um die psychologisch wichtige $60.000-Marke. Die US-Spot-Bitcoin-ETFs verzeichnen seit 6 Wochen in Folge Abflüsse, was strukturellen Verkaufsdruck erzeugt. Die Federal Reserve bleibt hawkish — Sep-Hike mit 63% eingepreist. Entscheidend wird der US-CPI am 14. Juli: ein Wert unter 3,8% könnte den Trend drehen.\n\n📌 Fachbegriffe:\n• 200-Wochen-MA: Langfristiger gleitender Durchschnitt über 200 Wochen — historisch starker Support\n• ETF-Abflüsse: Institutionelle Anleger verkaufen Bitcoin-ETF-Anteile → Verkaufsdruck\n• Hawkish: Fed signalisiert eher Zinserhöhungen als Senkungen\n\n📈 Auswirkung auf BTC/ETH:\nBearish kurzfristig. Erst ein Wochenschluss über $63.000 würde das Bild drehen.",
+    impact:"bearisch",
+    impactCol:"#e74c3c",
+    source:"CoinDesk"
   },
   {
-    tag:"KRYPTO", date:"26.06.", icon:"💥", impactCol:"#e74c3c", impact:"Bearisch strukturell",
-    title:"$1,09 Mrd. Liquidationen — $692 Mio. ETF-Abflüsse (Rekord seit Mai)",
-    summary:"$846 Mio. Long-Liquidationen. Größte Order: $38 Mio. BTC auf Hyperliquid.",
-    full:`Donnerstag war die härteste Session der Woche: BTC traf $58.189 — tiefster Stand seit September 2024.
-
-📌 Fachbegriffe erklärt:
-• Liquidation: Wenn ein gehebelter Trade (z.B. 10x Long) gegen dich läuft und die Sicherheitsleistung nicht mehr reicht, schließt die Börse die Position zwangsweise. Das verstärkt Kursabfälle durch Kaskaden-Effekte massiv.
-• Hyperliquid: Dezentrale Derivate-Börse on-chain (kein zentrales Unternehmen, kein KYC). $38 Mio. Einzelliquidation dort ist außergewöhnlich groß — zeigt institutionelle Größen auf DeFi.
-• ETF Nettoabflüsse ($692 Mio.): Mehr Geld floss aus BTC-ETFs ab als hinein. 6 Wochen in Folge Nettoabflüsse = institutionelle Verkäufer dominieren.
-• "Basically zero" ETF-Wachstum: Die ursprüngliche Thesis: ETFs bringen permanent neue institutionelle Käufer. Das trifft aktuell nicht zu — ETFs sind netto Verkäufer.
-• Cascade Liquidations: Wenn erste Liquidationen den Kurs drücken, werden weitere Stop-Losses getriggert, was weitere Liquidationen auslöst — selbstverstärkender Abwärtsdruck.
-
-📈 Auswirkung:
-Strukturell bearisch für BTC kurzfristig. Erst wenn ETF-Flows wieder positiv werden (positive Nettozuflüsse über mehrere Tage), ändert sich das übergeordnete institutionelle Bild.`,
+    tag:"KRYPTO",
+    date:"01.07.2026",
+    icon:"◎",
+    title:"Solana outperformt: +6,7% in 7 Tagen während Markt −4,8%",
+    summary:"SOL zeigt relative Stärke mit +6,7% in 7 Tagen und hält $74. SOL-ETF-Zuflüsse und Corporate-Treasury-Käufe als Treiber.",
+    full:"Solana ist der klare Outperformer der Woche: +6,7% während der Gesamtmarkt −4,8% verlor. Treiber: Spot-SOL-ETFs (Bitwise BSOL, Fidelity FSOL) mit über $1 Mrd. AUM, Forward Industries hält 6,9 Mio. SOL als Treasury, MoneyGram als neuer Netzwerk-Validator. Alpenglow-Upgrade (Q3 2026) soll Finalisierungszeit von 12s auf 150ms reduzieren — massiver technischer Sprung.\n\n📌 Fachbegriffe:\n• AUM: Assets Under Management — Verwaltetes Vermögen der ETFs\n• Validator: Netzwerkknoten der Transaktionen bestätigt und SOL verdient\n• Finalisierungszeit: Wie lange bis eine Transaktion unwiderruflich ist\n\n📈 Auswirkung:\nBullisch für SOL. Relative Stärke ist ein starkes Signal — SOL bleibt Top-Pick unter den Majors.",
+    impact:"bullisch",
+    impactCol:"#2ecc71",
+    source:"CoinGecko / CoinDesk"
   },
   {
-    tag:"REGULIERUNG", date:"25.06.", icon:"⚖️", impactCol:"#f0b429", impact:"Neutral bis leicht bearisch",
-    title:"CLARITY Act auf Herbst verschoben — Binance EU-Deadline 30.6.",
-    summary:"Senatsopposition verzögert wichtigstes US-Krypto-Gesetz. Binance sucht EU-Lizenz-Alternative.",
-    full:`Der CLARITY Act — das wichtigste US-Krypto-Regulierungsgesetz seit Jahren — wird wahrscheinlich auf die Herbst-Session verschoben.
-
-📌 Fachbegriffe erklärt:
-• CLARITY Act: US-Gesetz das klären soll, welche Kryptowährungen als Wertpapiere (SEC-Kontrolle) und welche als Rohstoffe (CFTC-Kontrolle) gelten. Massive Rechtsunsicherheit für US-Krypto-Unternehmen würde damit enden.
-• SEC vs. CFTC: Zwei verschiedene US-Behörden. SEC (Securities) reguliert Aktien/Wertpapiere. CFTC (Commodities) reguliert Bitcoin, Rohstoffe. Kampf beider Behörden um Krypto-Zuständigkeit ist ein Kernproblem.
-• MiCA (EU): Markets in Crypto-Assets — das europäische Krypto-Regulierungsframework. Bereits in Kraft. Alle Krypto-Börsen brauchen eine MiCA-Lizenz für EU-Betrieb.
-• Binance EU-Deadline: Binance muss bis 30. Juni eine MiCA-konforme Lizenz vorweisen oder Services für EU-Nutzer einstellen. Millionen EU-Nutzer, darunter viele österreichische Trader, betroffen.
-
-📈 Auswirkung:
-CLARITY-Verschiebung entfernt einen wichtigen kurzfristigen Policy-Tailwind. Binance-Problem könnte kurzfristig Sell-Druck durch erzwungene Nutzer-Exits auf andere Plattformen erzeugen.`,
+    tag:"KRYPTO",
+    date:"01.07.2026",
+    icon:"Ξ",
+    title:"Ethereum bei Multi-Jahres-Tief — $1.547 letzte Unterstützung",
+    summary:"ETH fällt auf $1.571 und nähert sich kritischem Support bei $1.547. Foundation-Krise und relative Schwäche vs. BTC und SOL belasten.",
+    full:"Ethereum handelt bei $1.571 nach −54% vom Januar-Hoch ($3.400). Der $1.547-Support ist laut Analysten 'der letzte bedeutende Boden vor unbekanntem Terrain'. Jeder Erholungsversuch in 2026 wurde aggressiv verkauft. Hauptprobleme: Ethereum Foundation Budget −40%, 9 Senior-Departures, Foundation-Krise. Positiv: MSSE-ETF-Approval könnte Katalysator sein.\n\n📌 Fachbegriffe:\n• Multi-Jahres-Tief: Niedrigster Preis seit mehreren Jahren\n• MSSE-ETF: Möglicher Spot-Ethereum-Staking-ETF in Genehmigungsprozess\n• Buyer Exhaustion: Käufer haben aufgegeben, weiteres Abwärtspotenzial\n\n📈 Auswirkung:\nBearish. Kein Long-Setup bis $1.650 zurückerobert wird.",
+    impact:"bearisch",
+    impactCol:"#e74c3c",
+    source:"Cryptopolitan / CoinDesk"
   },
   {
-    tag:"MAKRO", date:"25.06.", icon:"📉", impactCol:"#f0b429", impact:"Neutral",
-    title:"PCE Mai: Kern +3,4% YoY — Sep-Hike 63%, Dez 80%",
-    summary:"Personal Spending +0,7% MoM (beat). Wie erwartet — kein Bounce, aber auch kein Schock.",
-    full:`Der PCE-Preisindex (Fed's bevorzugtes Inflationsmaß) für Mai: Kern +3,4% YoY — genau wie erwartet.
-
-📌 Fachbegriffe erklärt:
-• PCE (Personal Consumption Expenditures): Misst Inflation aus Konsumentenperspektive. Die Fed bevorzugt PCE gegenüber CPI da er breiter und methodisch konsistenter ist.
-• Kern-PCE: PCE ohne Nahrung und Energie (zu volatil für Zinsentscheid). Das ist das eigentliche Fed-Ziel (langfristig 2%). Aktuell 3,4% = noch zu hoch.
-• Fed Funds Rate / Hike: US-Leitzins. "Hike" = Anhebung um 0,25%. Bei 3,50–3,75% aktuell. Höhere Zinsen = teurerer Kredit = weniger Risikobereitschaft = Krypto leidet.
-• Hawkish / Dovish: Hawkish = Fed will Zinsen erhöhen (Inflationsbekämpfung priorisiert). Dovish = Fed will Zinsen senken (Wirtschaftswachstum priorisiert). Warsh ist klar hawkish.
-• Dot Plot: War die Prognose aller Fed-Mitglieder für zukünftige Zinsen (jetzt abgeschafft von Warsh).
-
-📈 Auswirkung:
-PCE wie erwartet → kein September-Hike-Schock, aber auch keine Erleichterung. Entscheidend wird CPI 14. Juli — wenn der Ölpreis-Effekt sichtbar wird und CPI unter 3,8% fällt.`,
+    tag:"MAKRO",
+    date:"01.07.2026",
+    icon:"🏦",
+    title:"Fed bleibt hawkish — Sep-Hike 63%, Dez-Hike 80% eingepreist",
+    summary:"Die Federal Reserve signalisiert weitere Zinserhöhungen. Starker Dollar (DXY 101,6) belastet Gold, Krypto und Emerging Markets.",
+    full:"Fed-Chair Warsh überraschte die Märkte mit einem hawkishen Ton. Derivatemärkte preisen jetzt 63% Wahrscheinlichkeit für einen Sep-Hike und 80% für Dezember ein. Der US-Dollar-Index (DXY) stieg auf 101,6 — höchster Stand seit März. Direkte Auswirkung: Kapitalabfluss aus Risk-Assets (Krypto, Gold, EM). Gegenläufiges Signal: Öl fiel unter $73 (Hormuz wieder offen nach Iran-MOU) → CPI-Druck sinkt → möglicherweise geringerer Zinserhöhungsbedarf.\n\n📌 Fachbegriffe:\n• Hawkish: Zentralbank tendiert zu Zinserhöhungen zur Inflationsbekämpfung\n• DXY: US-Dollar-Index — misst Dollar-Stärke vs. 6 Hauptwährungen\n• Emerging Markets (EM): Schwellenländer — stark betroffen von starkem Dollar\n\n📈 Auswirkung:\nBearish für BTC/ETH/Gold kurzfristig. CPI 14. Juli ist der entscheidende Katalysator.",
+    impact:"bearisch",
+    impactCol:"#e74c3c",
+    source:"Reuters / CoinDesk"
   },
   {
-    tag:"AKTIEN", date:"24.06.", icon:"🤖", impactCol:"#2ecc71", impact:"Bullisch Risk-on",
-    title:"Micron: EPS +24%, Q4-Guidance $50 Mrd. — AI-Thesis bestätigt",
-    summary:"MU EPS $25,11 vs. $20,20. Revenue $41,5 Mrd. MU +14,6% AH. Anthropic-Chip-Deal.",
-    full:`Micron Technology lieferte einen der stärksten Quartalsberichte der Unternehmensgeschichte.
-
-📌 Fachbegriffe erklärt:
-• EPS (Earnings Per Share): Gewinn pro Aktie. $25,11 vs. $20,20 erwartet = +24% über Konsens.
-• HBM (High Bandwidth Memory): Hochleistungs-RAM-Chips speziell für KI-Training und -Inferenz (Nvidia H100/H200 nutzen HBM). Microns HBM-Kapazität bis 2026 vollständig ausverkauft = enorme, strukturelle AI-Nachfrage bestätigt.
-• Guidance: Unternehmensausblick. Q4-Guidance $50 Mrd. Revenue vs. $43,4 Mrd. erwartet = massiver Upside-Surprise.
-• AI-CAPEX-Thesis: Die Theorie dass große Tech-Unternehmen (Microsoft, Google, Amazon) massiv in KI-Infrastruktur investieren → gut für Chip-Hersteller (Nvidia, Micron, TSMC) → Risk-on-Sentiment.
-• Risk-on/Risk-off: Marktphasen. Risk-on = Investoren kaufen riskante Assets (Aktien, Krypto). Micron-Beat = Risk-on-Impuls der sich auf Krypto überträgt.
-
-📈 Auswirkung:
-BTC bouncte von $58.189 auf $63.500 nach dem Beat. Zeigt direkte Korrelation: Wenn AI-Thesis bestätigt → Tech-Sentiment steigt → Risk-on → Krypto profitiert. Anthropic-Chip-Deal (Micron liefert Chips für Claude-Infrastruktur) ist strategisch bedeutsam.`,
+    tag:"MAKRO",
+    date:"01.07.2026",
+    icon:"🛢️",
+    title:"Ölpreis unter $73 — Iran-MOU beendet Geopolitik-Prämie",
+    summary:"WTI-Öl fällt auf $71,90 nach US-Iran-Memorandum. Normalisierung der Hormuz-Straße drückt Energiepreise — positiv für Inflation und Fed-Zinspfad.",
+    full:"Das US-Iran Memorandum of Understanding (MOU) hat die Geopolitik-Risikoprämie aus dem Ölpreis genommen. WTI fiel von $100+ (Kriegspeak) auf $71,90. Die Straße von Hormuz ist wieder normal geöffnet, UAE exportiert 85% des Normalniveaus. Öl-Deflation bedeutet: Energie-CPI fällt → Gesamtinflation sinkt → Fed könnte weniger aggressiv hiken → positiv für Risk-Assets.\n\n📌 Fachbegriffe:\n• MOU: Memorandum of Understanding — politische Vereinbarung\n• Geopolitik-Prämie: Risikoaufschlag im Preis wegen politischer Unsicherheit\n• Hormuz-Straße: Wichtigste Öl-Schifffahrtsroute weltweit (20% des globalen Öls)\n\n📈 Auswirkung:\nMittel-bullisch für Krypto und Aktien. Niedrigere Energiekosten → niedrigere Inflation → weniger Zinserhöhungsdruck.",
+    impact:"bullisch",
+    impactCol:"#2ecc71",
+    source:"Reuters"
   },
   {
-    tag:"KRYPTO", date:"26.06.", icon:"🌐", impactCol:"#2ecc71", impact:"Bullisch strukturell SOL",
-    title:"KG Group (Südkorea): Solana-Payments-Netzwerk MOU",
-    summary:"KG Group + Solana Foundation MOU für SOL-basiertes Digital-Asset-Payments-Netzwerk.",
-    full:`KG Group — eines der größten südkoreanischen Konglomerate (Zahlungsabwicklung, Fintech) — unterzeichnete einen MOU mit der Solana Foundation.
-
-📌 Fachbegriffe erklärt:
-• MOU (Memorandum of Understanding): Absichtserklärung / Vorvertrag. Kein definitiver Vertrag, zeigt aber ernsthafte Intention beider Parteien und oft Vorstufe zu echtem Vertrag.
-• Payments-Netzwerk auf Solana: Nutzt Solanas Vorteile: ~65.000 TPS (Transaktionen pro Sekunde), Gebühren von ~$0,0001 pro Transaktion, Finalität in <1 Sekunde. Ideal für Zahlungsabwicklung.
-• Validator-Node: Computer der das Solana-Netzwerk betreibt und Transaktionen bestätigt. Toss Bank betreibt bereits eine. KG Group plant ebenfalls eine. Je mehr renommierte Institutionen Nodes betreiben, desto dezentraler und sicherer wird das Netzwerk.
-• Treasury: Wenn Unternehmen Krypto als Unternehmensreserve halten (wie Strategy/MicroStrategy mit BTC). Forward Industries hält 6,9 Mio. SOL als Treasury.
-
-📈 Auswirkung:
-Strukturell bullisch für SOL. Reale Adoption in Südkorea — einem der weltweit aktivsten Krypto-Märkte. Kombiniert mit Bloomberg 95% ETF-Approval-Wahrscheinlichkeit ist das fundamentale Basis für SOL-Outperformance.`,
+    tag:"REGULIERUNG",
+    date:"01.07.2026",
+    icon:"⚖️",
+    title:"CLARITY Act — US Krypto-Regulierung nimmt Form an",
+    summary:"Der CLARITY Act schreitet voran und könnte Rechtssicherheit für BTC, ETH und SOL schaffen. Institutionelle Adoption könnte beschleunigt werden.",
+    full:"Der CLARITY Act (Digital Asset Market Clarity Act) definiert welche Krypto-Assets als Commodities (CFTC) vs. Securities (SEC) gelten. BTC und ETH würden als Commodities eingestuft — klarer Vorteil für institutionelle Investoren. SOL-Status noch unklar aber ETF-Genehmigung (95% Bloomberg) deutet auf positive Einstufung hin. Timing: Abstimmung im Q3/Q4 2026 erwartet.\n\n📌 Fachbegriffe:\n• CFTC: Commodity Futures Trading Commission — reguliert Rohstoffe\n• SEC: Securities and Exchange Commission — reguliert Wertpapiere\n• Commodity: Rohstoff-Einstufung = weniger restriktive Regulierung für Krypto\n\n📈 Auswirkung:\nLangfristig stark bullisch. Regulierungsklarheit ist einer der wichtigsten Katalysatoren für den nächsten Bullrun.",
+    impact:"bullisch",
+    impactCol:"#2ecc71",
+    source:"CoinDesk / Reuters"
   },
 ];
